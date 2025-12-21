@@ -31,7 +31,7 @@ export interface EnvironmentCreationResult {
 export async function createCaidoEnvironment(
   sdk: SDK,
   variables: CaidoEnvironmentVariable[],
-  originalEnvironmentName: string
+  originalEnvironmentName: string,
 ): Promise<EnvironmentCreationResult> {
   try {
     // Frontend already passes the complete unique environment name (e.g., "[ReDocs]-Dev-1")
@@ -47,7 +47,7 @@ export async function createCaidoEnvironment(
           name: variable.name,
           value: variable.value,
           secret: variable.secret,
-          env: environmentName // Use environment name directly!
+          env: environmentName, // Use environment name directly!
         } as any);
         createdCount++;
       } catch (error) {
@@ -59,7 +59,7 @@ export async function createCaidoEnvironment(
     // Determine success based on results
     const allSuccessful = createdCount === variables.length;
     const partialSuccess = createdCount > 0 && createdCount < variables.length;
-    
+
     let message: string;
     if (allSuccessful) {
       message = `Successfully added ${createdCount} variables to environment`;
@@ -74,18 +74,17 @@ export async function createCaidoEnvironment(
       environmentName,
       variablesCreated: createdCount,
       message,
-      error: errors.length > 0 ? errors.join('; ') : undefined
+      error: errors.length > 0 ? errors.join("; ") : undefined,
     };
-
   } catch (error) {
     const errorMessage = `Failed to create environment: ${error}`;
-    
+
     return {
       success: false,
       environmentName: `[ReDocs]-${originalEnvironmentName}`,
       variablesCreated: 0,
       message: errorMessage,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 }
@@ -98,36 +97,39 @@ export async function createCaidoEnvironment(
  */
 export function validateEnvironmentCreation(
   variables: CaidoEnvironmentVariable[],
-  environmentName: string
+  environmentName: string,
 ): { valid: boolean; error?: string } {
   if (!environmentName || environmentName.trim().length === 0) {
-    return { valid: false, error: 'Environment name cannot be empty' };
+    return { valid: false, error: "Environment name cannot be empty" };
   }
 
   if (variables.length === 0) {
-    return { valid: false, error: 'At least one variable must be provided' };
+    return { valid: false, error: "At least one variable must be provided" };
   }
 
   // Check for duplicate variable names
-  const variableNames = variables.map(v => v.name.toLowerCase());
+  const variableNames = variables.map((v) => v.name.toLowerCase());
   const uniqueNames = new Set(variableNames);
   if (variableNames.length !== uniqueNames.size) {
-    return { valid: false, error: 'Duplicate variable names are not allowed' };
+    return { valid: false, error: "Duplicate variable names are not allowed" };
   }
 
   // Validate individual variables
   for (const variable of variables) {
     if (!variable.name || variable.name.trim().length === 0) {
-      return { valid: false, error: 'Variable names cannot be empty' };
+      return { valid: false, error: "Variable names cannot be empty" };
     }
-    
-    if (variable.name.includes(' ')) {
-      return { valid: false, error: 'Variable names cannot contain spaces' };
+
+    if (variable.name.includes(" ")) {
+      return { valid: false, error: "Variable names cannot contain spaces" };
     }
-    
+
     // Caido environment variable names should be valid identifiers
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(variable.name)) {
-      return { valid: false, error: `Invalid variable name: "${variable.name}". Use only letters, numbers, and underscores.` };
+      return {
+        valid: false,
+        error: `Invalid variable name: "${variable.name}". Use only letters, numbers, and underscores.`,
+      };
     }
   }
 
@@ -145,16 +147,16 @@ export function convertToCaidoVariables(
     value: string;
     enabled: boolean;
     isSecret: boolean;
-  }>
+  }>,
 ): CaidoEnvironmentVariable[] {
   // Note: Using global console.log since we don't have SDK access here
-  const filtered = environmentVariables.filter(variable => variable.enabled);
-  
-  const converted = filtered.map(variable => ({
+  const filtered = environmentVariables.filter((variable) => variable.enabled);
+
+  const converted = filtered.map((variable) => ({
     name: variable.key,
     value: variable.value,
     secret: variable.isSecret,
-    global: false
+    global: false,
   }));
   return converted;
 }

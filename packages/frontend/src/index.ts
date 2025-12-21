@@ -41,6 +41,6 @@ export const init = (sdk: FrontendSDK) => {
 
   // Add a sidebar item with Font Awesome icon for API documentation
   sdk.sidebar.registerItem("ReDocs", "/redocs", {
-    icon: "fas fa-file-import"
+    icon: "fas fa-file-import",
   });
 };

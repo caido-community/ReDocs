@@ -1,59 +1,79 @@
 import type { DefineAPI, SDK } from "caido:plugin";
-import { parsePostmanCollection, detectPostmanAuth } from "./parsers/postman.js";
-import { parseOpenAPISpec, detectOpenAPIAuth } from "./parsers/openapi.js";
-import { parsePostmanEnvironment } from "./parsers/environment.js";
-import { detectFileType, validateFileTypeSupport } from "./utils/fileDetection.js";
-import { createReplaySessions, type AuthConfig } from "./replay/sessionCreator.js";
-import { createCaidoEnvironment, validateEnvironmentCreation, convertToCaidoVariables } from "./utils/environmentCreation.js";
 
+import { parsePostmanEnvironment } from "./parsers/environment.js";
+import { detectOpenAPIAuth, parseOpenAPISpec } from "./parsers/openapi.js";
+import {
+  detectPostmanAuth,
+  parsePostmanCollection,
+} from "./parsers/postman.js";
+import {
+  type AuthConfig,
+  createReplaySessions,
+} from "./replay/sessionCreator.js";
+import {
+  convertToCaidoVariables,
+  createCaidoEnvironment,
+  validateEnvironmentCreation,
+} from "./utils/environmentCreation.js";
+import {
+  detectFileType,
+  validateFileTypeSupport,
+} from "./utils/fileDetection.js";
+
+// Export types for public usage
+export * from "./parsers/postman.js";
+export * from "./parsers/openapi.js";
+export * from "./parsers/environment.js";
+export * from "./utils/environmentCreation.js";
+export * from "./utils/fileDetection.js";
 
 const processImportFile = async (
   sdk: SDK,
   fileContent: string,
-  fileName: string
+  fileName: string,
 ) => {
   try {
     const detectionResult = detectFileType(sdk, fileContent, fileName);
 
-    // Validate that we can process this file type
     const validation = validateFileTypeSupport(detectionResult.type, fileName);
-    
+
     if (!validation.supported) {
       return {
         success: false,
         error: validation.message,
         fileType: detectionResult.type,
         detection: detectionResult,
-        message: `Cannot process ${fileName}: ${validation.message}`
+        message: `Cannot process ${fileName}: ${validation.message} `,
       };
     }
 
     let result: any = {};
     let authInfo: any = {};
 
-    if (detectionResult.type === 'postman') {
+    if (detectionResult.type === "postman") {
       const collection = await parsePostmanCollection(sdk, fileContent);
       authInfo = detectPostmanAuth(collection);
-      
+
       result = {
         success: true,
-        type: 'postman',
+        type: "postman",
         collectionName: collection.name,
         description: collection.description,
         sessionCount: collection.requests.length,
         requests: collection.requests,
         authentication: authInfo,
-        message: `Successfully parsed Postman collection "${collection.name}" with ${collection.requests.length} requests`
+        message: `Successfully parsed Postman collection "${collection.name}" with ${collection.requests.length} requests`,
       };
-
-    } else if (detectionResult.type === 'openapi') {
-      const isYaml = fileName.toLowerCase().endsWith('.yaml') || fileName.toLowerCase().endsWith('.yml');
+    } else if (detectionResult.type === "openapi") {
+      const isYaml =
+        fileName.toLowerCase().endsWith(".yaml") ||
+        fileName.toLowerCase().endsWith(".yml");
       const spec = await parseOpenAPISpec(sdk, fileContent, isYaml);
       authInfo = detectOpenAPIAuth(spec);
-      
+
       result = {
         success: true,
-        type: 'openapi',
+        type: "openapi",
         collectionName: spec.name,
         description: spec.description,
         version: spec.version,
@@ -61,66 +81,58 @@ const processImportFile = async (
         sessionCount: spec.requests.length,
         requests: spec.requests,
         authentication: authInfo,
-        message: `Successfully parsed OpenAPI specification "${spec.name}" with ${spec.requests.length} requests`
+        message: `Successfully parsed OpenAPI specification "${spec.name}" with ${spec.requests.length} requests`,
       };
-
-    } else if (detectionResult.type === 'environment') {
+    } else if (detectionResult.type === "environment") {
       const environment = await parsePostmanEnvironment(sdk, fileContent);
-      
+
       result = {
         success: true,
-        type: 'environment',
+        type: "environment",
         environmentName: environment.name,
         description: environment.description,
         variables: environment.variables,
         variableCount: environment.variables.length,
-        message: `Successfully parsed Postman environment "${environment.name}" with ${environment.variables.length} variables`
+        message: `Successfully parsed Postman environment "${environment.name}" with ${environment.variables.length} variables`,
       };
-
     } else {
-      throw new Error(`Unsupported file type: ${detectionResult.type}`);
+      throw new Error(`Unsupported file type: ${detectionResult.type} `);
     }
 
     return result;
-
   } catch (error: any) {
     return {
       success: false,
       error: error.message,
-      message: `Failed to process ${fileName}: ${error.message}`
+      message: `Failed to process ${fileName}: ${error.message} `,
     };
   }
 };
-
 
 const createSessionsFromRequests = async (
   sdk: SDK,
   requests: any[],
   collectionName: string,
-  authConfig: AuthConfig
+  authConfig: AuthConfig,
 ) => {
   try {
-    const result = await createReplaySessions(sdk, requests, collectionName, authConfig);
+    const result = await createReplaySessions(
+      sdk,
+      requests,
+      collectionName,
+      authConfig,
+    );
     return result;
   } catch (error: any) {
     return {
       success: false,
       processedRequests: [],
       collectionName,
-      message: `Failed to process sessions: ${error.message}`
+      message: `Failed to process sessions: ${error.message} `,
     };
   }
 };
 
-
-
-/**
- * Create environment variables in Caido from selected variables
- * @param sdk - Caido SDK instance
- * @param variables - Array of selected environment variables
- * @param originalEnvironmentName - Original environment name from Postman
- * @returns Environment creation result
- */
 const createEnvironmentVariables = async (
   sdk: SDK,
   variables: Array<{
@@ -129,42 +141,40 @@ const createEnvironmentVariables = async (
     enabled: boolean;
     isSecret: boolean;
   }>,
-  originalEnvironmentName: string
+  originalEnvironmentName: string,
 ) => {
   try {
-    // Validate input
     const convertedVariables = convertToCaidoVariables(variables);
-    
+
     const validation = validateEnvironmentCreation(
       convertedVariables,
-      originalEnvironmentName
+      originalEnvironmentName,
     );
-    
+
     if (!validation.valid) {
       return {
         success: false,
         error: validation.error,
-        message: `Validation failed: ${validation.error}`
+        message: `Validation failed: ${validation.error} `,
       };
     }
 
+    const result = await createCaidoEnvironment(
+      sdk,
+      convertedVariables,
+      originalEnvironmentName,
+    );
 
-    
-    // Create environment in Caido
-    const result = await createCaidoEnvironment(sdk, convertedVariables, originalEnvironmentName);
-    
     return result;
-
   } catch (error: any) {
-    const errorMessage = `Failed to create environment: ${error.message || error}`;
+    const errorMessage = `Failed to create environment: ${error.message || error} `;
 
-    
     return {
       success: false,
-      environmentName: `[ReDocs] - ${originalEnvironmentName}`,
+      environmentName: `[ReDocs] - ${originalEnvironmentName} `,
       variablesCreated: 0,
       message: errorMessage,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 };
