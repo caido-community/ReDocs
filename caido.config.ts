@@ -12,7 +12,7 @@ export default defineConfig({
   id,
   name: "ReDocs",
   description: "Import Postman Collections & OpenAPI Specifications as Replay Sessions",
-  version: "1.0.2",
+  version: "1.0.3",
   author: {
     name: "Amr Elsagaei",
     email: "info@amrelsagaei.com",
