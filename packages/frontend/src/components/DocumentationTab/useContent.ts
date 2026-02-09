@@ -127,7 +127,7 @@ export const useDocContent = () => {
 
   const aboutInfo = {
     name: "ReDocs",
-    version: "1.0.3",
+    version: "1.1.0",
     description:
       "ReDocs helps security professionals quickly import API documentation into Caido for security testing.",
     author: {
