@@ -61,8 +61,9 @@ export const useRequestProcessing = (sdk: FrontendSDK) => {
           duration: 5000,
         });
       }
-    } catch (error: any) {
-      sdk.window.showToast("Unexpected error: " + error.message, {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      sdk.window.showToast(`Unexpected error: ${message}`, {
         variant: "error",
         duration: 5000,
       });

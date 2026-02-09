@@ -34,8 +34,10 @@ export const useEnvironmentCreation = (sdk: FrontendSDK) => {
             },
           });
           break;
-        } catch (error: any) {
-          if (error.message && error.message.includes("already exists")) {
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (message.includes("already exists")) {
             uniqueEnvironmentName = `${baseEnvironmentName}-${counter}`;
             counter++;
             if (counter > 100) {
@@ -73,8 +75,9 @@ export const useEnvironmentCreation = (sdk: FrontendSDK) => {
           duration: 5000,
         });
       }
-    } catch (error: any) {
-      sdk.window.showToast("Unexpected error: " + error.message, {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      sdk.window.showToast(`Unexpected error: ${message}`, {
         variant: "error",
         duration: 5000,
       });

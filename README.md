@@ -18,7 +18,7 @@
 
 ## Overview
 
-ReDocs is a powerful Caido plugin that bridges the gap between API documentation and security testing by automatically converting Postman Collections and OpenAPI specifications into ready-to-use replay sessions. Built specifically for penetration testers and security researchers, ReDocs integrates seamlessly with Caido's workflow to enhance your security testing capabilities.
+ReDocs is a powerful Caido plugin that bridges the gap between API documentation and security testing by automatically converting Postman Collections, OpenAPI specifications, and Insomnia exports into ready-to-use replay sessions. Built specifically for penetration testers and security researchers, ReDocs integrates seamlessly with Caido's workflow to enhance your security testing capabilities.
 
 Transform your API docs into actionable security tests - because great security starts with great tooling!
 
@@ -28,9 +28,9 @@ Transform your API docs into actionable security tests - because great security 
 <summary><b>Smart Import Engine</b></summary>
 <br>
 
-- **Drag & Drop Import:** One-click import for Postman Collections, OpenAPI specs, and Postman Environment files
+- **Drag & Drop Import:** One-click import for Postman Collections, OpenAPI specs, Insomnia exports, and Postman Environment files
 - **Auto-Detection:** Intelligent file format recognition with confidence scoring
-- **Format Support:** Postman Collection v2.1, OpenAPI 3.x specifications, and Postman Environment files (JSON only)
+- **Format Support:** Postman Collection v2.1, OpenAPI 3.x (JSON), Insomnia export (JSON), Bruno OpenCollection (.yaml/.yml), Postman Environment (JSON). See `docs/` for example files (Postman, OpenAPI, Insomnia, Bruno, environment).
 - **Error Handling:** Comprehensive validation with detailed error messages
 </details>
 
@@ -94,7 +94,7 @@ Transform your API docs into actionable security tests - because great security 
 
 1. Download the latest `plugin_package.zip` from the [Releases](https://github.com/amrelsagaei/redocs/releases) page
 2. Open Caido
-3. Navigate to **Settings > Plugins**
+3. Navigate to **Plugins**
 4. Click **Install Package** and select the downloaded ZIP file
 
 ## Quick Start
@@ -102,10 +102,12 @@ Transform your API docs into actionable security tests - because great security 
 ### First Import
 
 1. **Prepare Your File:**
-   - Export your API collection from Postman as JSON
-   - Save your OpenAPI specification as JSON format
-   - Export Postman Environment files as JSON for variable import
-   - Ensure file size is under 10MB for optimal performance
+   - **Postman:** Export your collection as JSON (v2.1). Example: `docs/example-postman.json`
+   - **OpenAPI:** Save your spec as JSON (3.x). Example: `docs/example-openapi.json`
+   - **Insomnia:** Use **Export** to get a JSON file. Example: `docs/example-insomnia.json`
+   - **Bruno:** Use **Share** → **Export** as **Postman** or **OpenAPI**, or use OpenCollection YAML (.yaml/.yml). Example: `docs/example-bruno.yaml`
+   - **Environments:** Export Postman environment as JSON. Example: `docs/example-environment.json` (filename should contain "environment" or "env")
+   - Keep file size under 10MB for best performance
 
 2. **Import to ReDocs:**
    - Open ReDocs from the Caido sidebar
@@ -133,11 +135,9 @@ Transform your API docs into actionable security tests - because great security 
 
 ## Documentation
 
-Complete documentation is available within the plugin:
-- Click the **"Docs"** button in the top-right corner
-- Access comprehensive guides and usage examples
-- View quick start tutorials and best practices
-- Find troubleshooting tips and advanced features
+- **In-app:** Click the **"Docs"** button in ReDocs for guides, quick start, and troubleshooting.
+- **Example files:** The `docs/` folder contains sample files for every supported format (Postman, OpenAPI, Insomnia, Bruno YAML, Postman environment). Use them to verify imports. See `docs/README.md`.
+
 
 ## Feedback & Issues
 

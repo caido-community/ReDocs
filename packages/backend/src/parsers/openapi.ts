@@ -8,15 +8,15 @@ export interface OpenAPIRequest {
   headers: Record<string, string>;
   body?: {
     contentType: string;
-    schema?: any;
-    example?: any;
+    schema?: unknown;
+    example?: unknown;
   };
   parameters: Array<{
     name: string;
     in: "query" | "header" | "path" | "cookie";
     required: boolean;
-    schema: any;
-    example?: any;
+    schema: unknown;
+    example?: unknown;
   }>;
 }
 
@@ -26,7 +26,7 @@ export interface OpenAPISpec {
   version: string;
   baseUrl: string;
   requests: OpenAPIRequest[];
-  securitySchemes?: Record<string, any>;
+  securitySchemes?: Record<string, unknown>;
 }
 
 export async function parseOpenAPISpec(
@@ -35,14 +35,14 @@ export async function parseOpenAPISpec(
   isYaml: boolean = false,
 ): Promise<OpenAPISpec> {
   try {
-    let data: any;
+    let data: Record<string, unknown>;
 
     if (isYaml) {
       throw new Error(
         "YAML format is not currently supported. Please convert your OpenAPI specification to JSON format and try again.",
       );
     } else {
-      data = JSON.parse(content);
+      data = JSON.parse(content) as Record<string, unknown>;
     }
 
     if (!data.openapi && !data.swagger) {
@@ -51,48 +51,50 @@ export async function parseOpenAPISpec(
       );
     }
 
-    const title = data.info?.title || "Untitled API";
+    const info = data.info as Record<string, unknown> | undefined;
+    const title = (info?.title as string) || "Untitled API";
 
     let baseUrl = "";
-    if (data.servers && data.servers.length > 0) {
-      baseUrl = data.servers[0].url;
-    } else if (data.host) {
+    const servers = data.servers as Array<{ url?: string }> | undefined;
+    if (servers !== undefined && servers.length > 0 && servers[0]) {
+      baseUrl = servers[0].url ?? "";
+    } else if (data.host !== undefined) {
+      const schemes = data.schemes as string[] | undefined;
       const protocol =
-        data.schemes && data.schemes.includes("https") ? "https" : "http";
+        schemes !== undefined && schemes.includes("https") ? "https" : "http";
       baseUrl = `${protocol}://${data.host}`;
-      if (data.basePath) {
-        baseUrl += data.basePath;
+      if (data.basePath !== undefined) {
+        baseUrl += String(data.basePath);
       }
     }
 
+    const components = data.components as Record<string, unknown> | undefined;
     const spec: OpenAPISpec = {
       name: title,
-      description: data.info?.description,
-      version: data.info?.version || "1.0.0",
+      description: info?.description as string | undefined,
+      version: (info?.version as string) || "1.0.0",
       baseUrl,
       requests: [],
       securitySchemes:
-        data.components?.securitySchemes || data.securityDefinitions,
+        (components?.securitySchemes as Record<string, unknown>) ??
+        (data.securityDefinitions as Record<string, unknown>),
     };
 
-    spec.requests = await extractOpenAPIRequests(
-      sdk,
-      data.paths || {},
-      baseUrl,
-      data,
-    );
+    const pathsObj = (data.paths as Record<string, unknown>) ?? {};
+    spec.requests = await extractOpenAPIRequests(sdk, pathsObj, baseUrl, data);
 
     return spec;
-  } catch (error: any) {
-    throw new Error(`Failed to parse OpenAPI specification: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse OpenAPI specification: ${message}`);
   }
 }
 
 async function extractOpenAPIRequests(
   sdk: SDK,
-  paths: Record<string, any>,
+  paths: Record<string, unknown>,
   baseUrl: string,
-  spec: any,
+  spec: Record<string, unknown>,
 ): Promise<OpenAPIRequest[]> {
   const requests: OpenAPIRequest[] = [];
   const httpMethods = [
@@ -107,9 +109,10 @@ async function extractOpenAPIRequests(
   ];
 
   for (const [path, pathItem] of Object.entries(paths)) {
+    const item = pathItem as Record<string, unknown>;
     for (const method of httpMethods) {
-      if (pathItem[method]) {
-        const operation = pathItem[method];
+      if (item[method] !== undefined) {
+        const operation = item[method] as Record<string, unknown>;
         const request = await parseOpenAPIOperation(
           sdk,
           method,
@@ -130,9 +133,9 @@ async function extractOpenAPIRequests(
 
 function resolveSchemaRef(
   ref: string,
-  spec: any,
+  spec: Record<string, unknown>,
   visited: Set<string> = new Set(),
-): any {
+): unknown {
   if (visited.has(ref)) {
     return { type: "object", description: `Circular reference to ${ref}` };
   }
@@ -140,138 +143,137 @@ function resolveSchemaRef(
   visited.add(ref);
 
   if (!ref.startsWith("#/")) {
-    return null;
+    return undefined;
   }
 
   const path = ref.substring(2).split("/");
-  let current = spec;
+  let current: unknown = spec;
 
   for (const segment of path) {
-    if (!current || typeof current !== "object" || !(segment in current)) {
-      return null;
+    if (
+      current === undefined ||
+      current === null ||
+      typeof current !== "object" ||
+      !(segment in current)
+    ) {
+      return undefined;
     }
-    current = current[segment];
+    current = (current as Record<string, unknown>)[segment];
   }
 
-  if (current && typeof current === "object" && current.$ref) {
-    return resolveSchemaRef(current.$ref, spec, visited);
+  if (
+    current !== undefined &&
+    current !== null &&
+    typeof current === "object" &&
+    "$ref" in current
+  ) {
+    return resolveSchemaRef(
+      (current as Record<string, unknown>).$ref as string,
+      spec,
+      visited,
+    );
   }
 
   return current;
 }
 
 function generateExampleFromSchema(
-  schema: any,
-  spec: any,
+  schema: unknown,
+  spec: Record<string, unknown>,
   visited: Set<string> = new Set(),
-): any {
-  if (!schema || typeof schema !== "object") {
-    return null;
+): unknown {
+  if (schema === undefined || schema === null || typeof schema !== "object") {
+    return undefined;
   }
 
-  if (schema.$ref) {
-    if (visited.has(schema.$ref)) {
-      return null;
+  const s = schema as Record<string, unknown>;
+  if (s.$ref !== undefined) {
+    if (visited.has(s.$ref as string)) {
+      return undefined;
     }
     const resolvedSchema = resolveSchemaRef(
-      schema.$ref,
+      s.$ref as string,
       spec,
       new Set(visited),
     );
-    if (resolvedSchema) {
-      visited.add(schema.$ref);
+    if (resolvedSchema !== undefined) {
+      visited.add(s.$ref as string);
       return generateExampleFromSchema(resolvedSchema, spec, visited);
     }
-    return null;
+    return undefined;
   }
 
-  if (schema.example !== undefined) {
-    return schema.example;
+  if (s.example !== undefined) {
+    return s.example;
   }
-  switch (schema.type) {
-    case "string":
-      if (schema.enum && schema.enum.length > 0) {
-        return schema.enum[0];
+  const schemaType = s.type as string | undefined;
+  switch (schemaType) {
+    case "string": {
+      const enumArr = s.enum as unknown[] | undefined;
+      if (enumArr !== undefined && enumArr.length > 0) {
+        return enumArr[0];
       }
-      if (schema.format === "email") {
-        return "user@example.com";
-      }
-      if (schema.format === "date") {
-        return "2024-01-01";
-      }
-      if (schema.format === "date-time") {
-        return "2024-01-01T00:00:00Z";
-      }
-      if (schema.format === "uuid") {
-        return "550e8400-e29b-41d4-a716-446655440000";
-      }
-      return schema.pattern ? "example" : "string";
-
+      const format = s.format as string | undefined;
+      if (format === "email") return "user@example.com";
+      if (format === "date") return "2024-01-01";
+      if (format === "date-time") return "2024-01-01T00:00:00Z";
+      if (format === "uuid") return "550e8400-e29b-41d4-a716-446655440000";
+      return s.pattern !== undefined ? "example" : "string";
+    }
     case "number":
-    case "integer":
-      if (schema.enum && schema.enum.length > 0) {
-        return schema.enum[0];
+    case "integer": {
+      const enumArr = s.enum as unknown[] | undefined;
+      if (enumArr !== undefined && enumArr.length > 0) {
+        return enumArr[0];
       }
-      return schema.minimum !== undefined ? schema.minimum : 0;
-
+      return s.minimum !== undefined ? s.minimum : 0;
+    }
     case "boolean":
       return true;
-
-    case "array":
-      if (schema.items) {
-        const itemExample = generateExampleFromSchema(
-          schema.items,
-          spec,
-          visited,
-        );
-        return itemExample !== null ? [itemExample] : [];
+    case "array": {
+      const items = s.items;
+      if (items !== undefined) {
+        const itemExample = generateExampleFromSchema(items, spec, visited);
+        return itemExample !== undefined ? [itemExample] : [];
       }
       return [];
-
+    }
     case "object": {
-      const obj: any = {};
-
-      if (schema.properties) {
-        for (const [propName, propSchema] of Object.entries(
-          schema.properties,
-        )) {
+      const obj: Record<string, unknown> = {};
+      const properties = s.properties as Record<string, unknown> | undefined;
+      if (properties !== undefined) {
+        for (const [propName, propSchema] of Object.entries(properties)) {
           const propExample = generateExampleFromSchema(
             propSchema,
             spec,
             visited,
           );
-          if (propExample !== null) {
+          if (propExample !== undefined) {
             obj[propName] = propExample;
           }
         }
       }
-
-      if (schema.required && Array.isArray(schema.required)) {
-        for (const requiredProp of schema.required) {
+      const required = s.required as string[] | undefined;
+      if (required !== undefined && Array.isArray(required)) {
+        for (const requiredProp of required) {
           if (
             !(requiredProp in obj) &&
-            schema.properties &&
-            schema.properties[requiredProp]
+            properties?.[requiredProp] !== undefined
           ) {
             const propExample = generateExampleFromSchema(
-              schema.properties[requiredProp],
+              properties[requiredProp],
               spec,
               visited,
             );
-            if (propExample !== null) {
-              obj[requiredProp] = propExample;
-            } else {
-              obj[requiredProp] = "required_value";
-            }
+            obj[requiredProp] =
+              propExample !== undefined ? propExample : "required_value";
           }
         }
       }
-
-      return Object.keys(obj).length > 0 ? obj : null;
+      return Object.keys(obj).length > 0 ? obj : undefined;
     }
-
     default:
-      return null;
+      return undefined;
   }
 }
 
@@ -279,20 +281,22 @@ async function parseOpenAPIOperation(
   sdk: SDK,
   method: string,
   path: string,
-  operation: any,
+  operation: Record<string, unknown>,
   baseUrl: string,
-  spec: any,
+  spec: Record<string, unknown>,
 ): Promise<OpenAPIRequest | undefined> {
   try {
     const upperMethod = method.toUpperCase();
     const fullUrl = baseUrl ? `${baseUrl.replace(/\/$/, "")}${path}` : path;
 
     const operationName =
-      operation.summary || operation.operationId || `${upperMethod} ${path}`;
+      (operation.summary as string) ||
+      (operation.operationId as string) ||
+      `${upperMethod} ${path}`;
 
     const request: OpenAPIRequest = {
       id:
-        operation.operationId ||
+        (operation.operationId as string) ||
         `${upperMethod}_${path.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now()}`,
       name: operationName,
       method: upperMethod,
@@ -301,27 +305,34 @@ async function parseOpenAPIOperation(
       parameters: [],
     };
 
-    if (operation.parameters && Array.isArray(operation.parameters)) {
-      for (const param of operation.parameters) {
+    const parameters = operation.parameters as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (parameters !== undefined && Array.isArray(parameters)) {
+      for (const param of parameters) {
         request.parameters.push({
-          name: param.name,
-          in: param.in,
-          required: param.required || false,
-          schema: param.schema || param.type || "string",
+          name: (param.name as string) ?? "",
+          in: (param.in as OpenAPIRequest["parameters"][0]["in"]) ?? "query",
+          required: (param.required as boolean) ?? false,
+          schema: (param.schema ?? param.type ?? "string") as unknown,
           example: param.example,
         });
-
-        if (param.in === "header" && param.example) {
-          request.headers[param.name] = param.example.toString();
+        if (param.in === "header" && param.example !== undefined) {
+          request.headers[(param.name as string) ?? ""] = String(param.example);
         }
       }
     }
 
+    const requestBody = operation.requestBody as
+      | Record<string, unknown>
+      | undefined;
     if (
-      operation.requestBody &&
+      requestBody !== undefined &&
       ["POST", "PUT", "PATCH"].includes(upperMethod)
     ) {
-      const content = operation.requestBody.content;
+      const content = requestBody.content as
+        | Record<string, unknown>
+        | undefined;
       if (content) {
         const supportedTypes = [
           "application/json",
@@ -329,26 +340,31 @@ async function parseOpenAPIOperation(
           "multipart/form-data",
         ];
         let contentType = "";
-        let bodySchema = null;
-        let bodyExample = null;
+        let bodySchema: unknown = undefined;
+        let bodyExample: unknown = undefined;
 
         for (const type of supportedTypes) {
-          if (content[type]) {
+          const ct = content?.[type] as Record<string, unknown> | undefined;
+          if (ct !== undefined) {
             contentType = type;
-            bodySchema = content[type].schema;
-            bodyExample = content[type].example || content[type].examples;
+            bodySchema = ct.schema;
+            bodyExample = ct.example ?? ct.examples;
             break;
           }
         }
 
-        if (contentType && bodySchema) {
-          if (!bodyExample && contentType === "application/json") {
+        if (
+          contentType !== "" &&
+          bodySchema !== undefined &&
+          bodySchema !== null
+        ) {
+          if (bodyExample === undefined && contentType === "application/json") {
             try {
               const generatedExample = generateExampleFromSchema(
                 bodySchema,
                 spec,
               );
-              if (generatedExample !== null) {
+              if (generatedExample !== undefined) {
                 bodyExample = generatedExample;
               }
             } catch (error) {
@@ -369,32 +385,32 @@ async function parseOpenAPIOperation(
       }
     }
 
-    if (operation.responses) {
+    const responses = operation.responses as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    if (responses !== undefined) {
       const successResponse =
-        operation.responses["200"] ||
-        operation.responses["201"] ||
-        operation.responses["default"];
-
-      if (successResponse && successResponse.headers) {
-        for (const [headerName, headerSpec] of Object.entries(
-          successResponse.headers,
-        )) {
+        responses["200"] ?? responses["201"] ?? responses["default"];
+      const headers = successResponse?.headers as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      if (headers !== undefined) {
+        for (const [headerName, headerSpec] of Object.entries(headers)) {
+          const specObj = headerSpec;
           if (
-            headerSpec &&
-            typeof headerSpec === "object" &&
-            (headerSpec as any).example &&
+            specObj !== undefined &&
+            typeof specObj === "object" &&
+            specObj.example !== undefined &&
             headerName.toLowerCase().includes("auth")
           ) {
-            request.headers[headerName] = (
-              headerSpec as any
-            ).example.toString();
+            request.headers[headerName] = String(specObj.example);
           }
         }
       }
     }
 
     return request;
-  } catch (error: any) {
+  } catch {
     return undefined;
   }
 }
@@ -410,28 +426,30 @@ export function detectOpenAPIAuth(spec: OpenAPISpec): {
 
   if (spec.securitySchemes) {
     for (const [name, scheme] of Object.entries(spec.securitySchemes)) {
+      const s = scheme as Record<string, unknown>;
+      const schemeType = (s.type as string) ?? "unknown";
       let description = "";
 
-      switch (scheme.type) {
+      switch (schemeType) {
         case "http":
-          description = `HTTP ${scheme.scheme} authentication`;
+          description = `HTTP ${String(s.scheme ?? "")} authentication`;
           break;
         case "apiKey":
-          description = `API key in ${scheme.in}: ${scheme.name}`;
+          description = `API key in ${String(s.in ?? "")}: ${String(s.name ?? "")}`;
           break;
         case "oauth2":
-          description = `OAuth 2.0 authentication`;
+          description = "OAuth 2.0 authentication";
           break;
         case "openIdConnect":
-          description = `OpenID Connect authentication`;
+          description = "OpenID Connect authentication";
           break;
         default:
-          description = `${scheme.type} authentication`;
+          description = `${schemeType} authentication`;
       }
 
       schemes.push({
         name,
-        type: scheme.type,
+        type: schemeType,
         description,
       });
     }

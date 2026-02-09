@@ -15,42 +15,30 @@ type EnvironmentCreationResult = {
   error?: string;
 };
 
-/**
- * Create environment variables in Caido
- * @param sdk - Caido SDK instance
- * @param variables - Array of variables to create
- * @param originalEnvironmentName - Original environment name from Postman
- * @returns Creation result
- */
 export async function createCaidoEnvironment(
   sdk: SDK,
   variables: CaidoEnvironmentVariable[],
   originalEnvironmentName: string,
 ): Promise<EnvironmentCreationResult> {
   try {
-    // Frontend already passes the complete unique environment name (e.g., "[ReDocs]-Dev-1")
     const environmentName = originalEnvironmentName;
     let createdCount = 0;
     const errors: string[] = [];
 
-    // Backend only handles adding variables to the existing environment
     for (const variable of variables) {
       try {
-        // TypeScript linter shows error for 'env' but this works in actual Caido SDK
         await sdk.env.setVar({
           name: variable.name,
           value: variable.value,
           secret: variable.secret,
-          env: environmentName, // Use environment name directly!
-        } as any);
+          env: environmentName,
+        } as Parameters<typeof sdk.env.setVar>[0] & { env: string });
         createdCount++;
       } catch (error) {
         const errorMsg = `Failed to create variable "${variable.name}": ${error}`;
         errors.push(errorMsg);
       }
     }
-
-    // Determine success based on results
     const allSuccessful = createdCount === variables.length;
     const partialSuccess = createdCount > 0 && createdCount < variables.length;
 
@@ -83,17 +71,11 @@ export async function createCaidoEnvironment(
   }
 }
 
-/**
- * Validate environment creation parameters
- * @param variables - Variables to validate
- * @param environmentName - Environment name to validate
- * @returns Validation result
- */
 export function validateEnvironmentCreation(
   variables: CaidoEnvironmentVariable[],
   environmentName: string,
 ): { valid: boolean; error?: string } {
-  if (!environmentName || environmentName.trim().length === 0) {
+  if (environmentName.trim().length === 0) {
     return { valid: false, error: "Environment name cannot be empty" };
   }
 
@@ -101,16 +83,14 @@ export function validateEnvironmentCreation(
     return { valid: false, error: "At least one variable must be provided" };
   }
 
-  // Check for duplicate variable names
   const variableNames = variables.map((v) => v.name.toLowerCase());
   const uniqueNames = new Set(variableNames);
   if (variableNames.length !== uniqueNames.size) {
     return { valid: false, error: "Duplicate variable names are not allowed" };
   }
 
-  // Validate individual variables
   for (const variable of variables) {
-    if (!variable.name || variable.name.trim().length === 0) {
+    if (variable.name.trim().length === 0) {
       return { valid: false, error: "Variable names cannot be empty" };
     }
 
@@ -118,7 +98,6 @@ export function validateEnvironmentCreation(
       return { valid: false, error: "Variable names cannot contain spaces" };
     }
 
-    // Caido environment variable names should be valid identifiers
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(variable.name)) {
       return {
         valid: false,
@@ -130,11 +109,6 @@ export function validateEnvironmentCreation(
   return { valid: true };
 }
 
-/**
- * Convert parsed environment variables to Caido format
- * @param environmentVariables - Parsed environment variables from frontend
- * @returns Array of Caido-formatted variables
- */
 export function convertToCaidoVariables(
   environmentVariables: Array<{
     key: string;

@@ -1,4 +1,15 @@
-export type MinimalYamlDoc = Record<string, unknown>;
+type MinimalYamlDoc = Record<string, unknown>;
+
+function unquoteYamlScalar(value: string): string {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value
+      .slice(1, -1)
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\")
+      .replace(/\\n/g, "\n");
+  }
+  return value;
+}
 
 function getIndent(line: string): number {
   const match = line.match(/^(\s*)/);
@@ -77,7 +88,7 @@ function parseOneDocument(docContent: string): MinimalYamlDoc {
       const arr = top.parent[top.key];
       if (!Array.isArray(arr)) continue;
       const item: Record<string, unknown> = {};
-      if (key !== undefined) item[key] = val?.trim() ?? "";
+      if (key !== undefined) item[key] = unquoteYamlScalar(val?.trim() ?? "");
       arr.push(item);
       continue;
     }
@@ -97,7 +108,7 @@ function parseOneDocument(docContent: string): MinimalYamlDoc {
       const arr = top.parent[top.key];
       if (Array.isArray(arr) && arr.length > 0) {
         const last = arr[arr.length - 1] as Record<string, unknown>;
-        last.value = valuePart;
+        last.value = unquoteYamlScalar(valuePart);
       }
       continue;
     }
@@ -110,7 +121,7 @@ function parseOneDocument(docContent: string): MinimalYamlDoc {
     }
 
     if (valuePart !== "") {
-      obj[key] = valuePart;
+      obj[key] = unquoteYamlScalar(valuePart);
       continue;
     }
 

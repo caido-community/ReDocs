@@ -23,40 +23,74 @@ export interface PostmanCollection {
   name: string;
   description?: string;
   requests: PostmanRequest[];
-  auth?: any;
+  auth?: PostmanRequest["auth"];
 }
+
+type PostmanItem = {
+  id?: string;
+  name?: string;
+  request?: PostmanRequestRaw;
+  item?: PostmanItem[];
+};
+
+type PostmanRequestRaw = {
+  method?: string;
+  url?:
+    | string
+    | {
+        raw?: string;
+        protocol?: string;
+        host?: string[];
+        port?: string;
+        path?: string[];
+      };
+  header?: Array<{ key?: string; value?: string; disabled?: boolean }>;
+  body?: {
+    mode?: string;
+    raw?: string;
+    formdata?: Array<{
+      key?: string;
+      value?: string;
+      type?: string;
+      disabled?: boolean;
+    }>;
+  };
+  auth?: PostmanRequest["auth"];
+};
 
 export async function parsePostmanCollection(
   sdk: SDK,
   content: string,
 ): Promise<PostmanCollection> {
   try {
-    const data = JSON.parse(content);
-
-    // Validate that this is a Postman collection
-    if (!data.info || !data.info.name) {
+    const data = JSON.parse(content) as Record<string, unknown>;
+    const info = data.info as Record<string, unknown> | undefined;
+    if (info === undefined || typeof info?.name !== "string") {
       throw new Error("Invalid Postman collection: missing info.name");
     }
 
     const collection: PostmanCollection = {
-      name: data.info.name,
-      description: data.info.description,
+      name: info.name,
+      description:
+        typeof info.description === "string" ? info.description : undefined,
       requests: [],
-      auth: data.auth,
+      auth: data.auth as PostmanCollection["auth"],
     };
-
-    // Extract requests from items (can be nested in folders)
-    collection.requests = await extractPostmanRequests(sdk, data.item || []);
+    collection.requests = await extractPostmanRequests(
+      sdk,
+      Array.isArray(data.item) ? data.item : [],
+    );
 
     return collection;
-  } catch (error: any) {
-    throw new Error(`Failed to parse Postman collection: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse Postman collection: ${message}`);
   }
 }
 
 async function extractPostmanRequests(
   sdk: SDK,
-  items: any[],
+  items: PostmanItem[],
 ): Promise<PostmanRequest[]> {
   const requests: PostmanRequest[] = [];
 
@@ -76,8 +110,8 @@ async function extractPostmanRequests(
 }
 
 async function parsePostmanRequest(
-  sdk: SDK,
-  item: any,
+  _sdk: SDK,
+  item: PostmanItem,
 ): Promise<PostmanRequest | undefined> {
   try {
     const request = item.request;
@@ -127,9 +161,13 @@ async function parsePostmanRequest(
       }
 
       if (request.body.formdata && Array.isArray(request.body.formdata)) {
-        parsedRequest.body.formdata = request.body.formdata.filter(
-          (item: any) => !item.disabled,
-        );
+        parsedRequest.body.formdata = request.body.formdata
+          .filter((entry) => !entry.disabled)
+          .map((entry) => ({
+            key: entry.key ?? "",
+            value: entry.value ?? "",
+            type: entry.type ?? "text",
+          }));
       }
     }
 

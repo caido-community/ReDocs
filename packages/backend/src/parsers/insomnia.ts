@@ -19,7 +19,7 @@ export type InsomniaRequest = {
   };
 };
 
-export type InsomniaCollection = {
+type InsomniaCollection = {
   name: string;
   description?: string;
   requests: InsomniaRequest[];

@@ -4,9 +4,6 @@ import { isPostmanEnvironment } from "../parsers/environment.js";
 
 import { parseFirstDocument } from "./minimalYaml.js";
 
-/**
- * File type detection result
- */
 export interface FileTypeResult {
   type:
     | "postman"
@@ -19,20 +16,12 @@ export interface FileTypeResult {
   details: string;
 }
 
-/**
- * Detects the type of API documentation file based on content analysis
- * @param sdk - Caido SDK instance
- * @param content - Raw file content
- * @param fileName - Original file name (for additional hints)
- * @returns File type detection result
- */
 export function detectFileType(
   sdk: SDK,
   content: string,
   fileName: string,
 ): FileTypeResult {
   try {
-    // Parse as JSON first
     const data = JSON.parse(content);
 
     if (isPostmanCollection(data)) {
@@ -139,47 +128,46 @@ function isBrunoOpenCollectionYaml(data: unknown): boolean {
   );
 }
 
-function isPostmanCollection(data: any): boolean {
-  if (!data.info || typeof data.info !== "object") {
+function isPostmanCollection(data: Record<string, unknown>): boolean {
+  const info = data.info;
+  if (info === undefined || info === null || typeof info !== "object") {
     return false;
   }
-
-  if (!data.info.name || typeof data.info.name !== "string") {
+  const infoObj = info as Record<string, unknown>;
+  if (infoObj.name === undefined || typeof infoObj.name !== "string") {
     return false;
   }
-
   const hasPostmanSchema =
-    data.info.schema &&
-    typeof data.info.schema === "string" &&
-    data.info.schema.includes("postman");
-
-  const hasPostmanStructure = data.item && Array.isArray(data.item);
-
+    typeof infoObj.schema === "string" && infoObj.schema.includes("postman");
+  const hasPostmanStructure = Array.isArray(data.item);
   const hasPostmanVersion =
-    data.info._postman_id || data.info.version || hasPostmanSchema;
-
+    infoObj._postman_id !== undefined ||
+    infoObj.version !== undefined ||
+    hasPostmanSchema;
   return hasPostmanSchema || (hasPostmanStructure && hasPostmanVersion);
 }
 
-function isOpenAPISpec(data: any): boolean {
-  if (data.openapi && typeof data.openapi === "string") {
+function isOpenAPISpec(data: Record<string, unknown>): boolean {
+  if (typeof data.openapi === "string") {
     return data.openapi.startsWith("3.");
   }
-
-  if (data.swagger && typeof data.swagger === "string") {
+  if (typeof data.swagger === "string") {
     return data.swagger.startsWith("2.");
   }
-
+  const info = data.info;
+  const paths = data.paths;
   if (
-    data.info &&
-    data.paths &&
-    typeof data.info === "object" &&
-    typeof data.paths === "object"
+    info !== undefined &&
+    paths !== undefined &&
+    typeof info === "object" &&
+    typeof paths === "object" &&
+    paths !== null
   ) {
-    const pathKeys = Object.keys(data.paths);
-    if (pathKeys.length > 0 && pathKeys[0]) {
-      const firstPath = data.paths[pathKeys[0]];
-      if (firstPath && typeof firstPath === "object") {
+    const pathKeys = Object.keys(paths);
+    const firstKey = pathKeys[0];
+    if (firstKey !== undefined) {
+      const firstPath = (paths as Record<string, unknown>)[firstKey];
+      if (firstPath !== undefined && typeof firstPath === "object") {
         const httpMethods = [
           "get",
           "post",
@@ -190,15 +178,12 @@ function isOpenAPISpec(data: any): boolean {
           "options",
         ];
         const hasHttpMethods = httpMethods.some(
-          (method) => method in firstPath,
+          (method) => method in (firstPath as object),
         );
-        if (hasHttpMethods) {
-          return true;
-        }
+        if (hasHttpMethods) return true;
       }
     }
   }
-
   return false;
 }
 
@@ -262,7 +247,6 @@ function detectFromFilename(
     }
   }
 
-  // OpenAPI specification patterns
   const openApiPatterns = [
     "openapi",
     "swagger",
@@ -289,7 +273,6 @@ function detectFromFilename(
 }
 
 function isLikelyYAML(content: string, fileName: string): boolean {
-  // Check file extension
   if (
     fileName.toLowerCase().endsWith(".yaml") ||
     fileName.toLowerCase().endsWith(".yml")

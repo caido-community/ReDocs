@@ -6,8 +6,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint -c ../../eslint.config.mjs src --fix",
-    "knip": "knip",
-    "test": "node --import tsx --test src/utils/minimalYaml.test.ts"
+    "knip": "knip"
   },
   "dependencies": {
     "shared": "workspace:*"
@@ -16,6 +15,6 @@
     "@caido/sdk-backend": "^0.46.0",
     "eslint": "^9.39.2",
     "knip": "^5.83.1",
-    "tsx": "^4.19.2"
+    "vitest": "^4.0.17"
   }
 }

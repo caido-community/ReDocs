@@ -1,8 +1,10 @@
 import { ref } from "vue";
 
-import type { ProcessedRequest } from "../types/index.js";
+import type { ProcessedRequest, RequestSpec } from "../types/index.js";
 import type { FrontendSDK } from "../types.js";
 import { buildRawRequest } from "../utils";
+
+type ReplayCollection = { name: string; id: string };
 
 export const useReplaySession = (sdk: FrontendSDK) => {
   const isCreating = ref(false);
@@ -16,21 +18,21 @@ export const useReplaySession = (sdk: FrontendSDK) => {
       isCreating.value = true;
       creationProgress.value = "Creating collection...";
 
-      const collections = sdk.replay.getCollections();
+      const collections = sdk.replay.getCollections() as ReplayCollection[];
       let finalCollectionName = collectionName;
       let targetCollectionId = collections.find(
-        (c: any) => c.name === finalCollectionName,
+        (c) => c.name === finalCollectionName,
       )?.id;
 
-      if (targetCollectionId) {
+      if (targetCollectionId !== undefined) {
         let counter = 1;
         do {
           finalCollectionName = `${collectionName}${counter}`;
           targetCollectionId = collections.find(
-            (c: any) => c.name === finalCollectionName,
+            (c) => c.name === finalCollectionName,
           )?.id;
           counter++;
-        } while (targetCollectionId && counter < 100);
+        } while (targetCollectionId !== undefined && counter < 100);
       }
 
       const createCollectionResult =
@@ -55,7 +57,7 @@ export const useReplaySession = (sdk: FrontendSDK) => {
       const sessionErrors: string[] = [];
 
       const processSession = async (
-        spec: any,
+        spec: RequestSpec,
         sessionName: string,
         index: number,
       ): Promise<void> => {
@@ -85,15 +87,20 @@ export const useReplaySession = (sdk: FrontendSDK) => {
             return;
           }
 
+          const replay = sdk.replay as unknown as {
+            moveSession: (
+              sessionId: string,
+              collectionId: string,
+            ) => Promise<unknown>;
+          };
           try {
-            await (sdk.replay as any).moveSession(
-              sessionId,
-              targetCollectionId,
-            );
-          } catch (moveError: any) {
-            sessionErrors.push(
-              `Session ${index + 1} move: ${moveError.message}`,
-            );
+            await replay.moveSession(sessionId, targetCollectionId);
+          } catch (moveError: unknown) {
+            const msg =
+              moveError instanceof Error
+                ? moveError.message
+                : String(moveError);
+            sessionErrors.push(`Session ${index + 1} move: ${msg}`);
           }
 
           try {
@@ -101,15 +108,21 @@ export const useReplaySession = (sdk: FrontendSDK) => {
               id: sessionId,
               name: sessionName,
             });
-          } catch (renameError: any) {
-            sessionErrors.push(
-              `Session ${index + 1} rename: ${renameError.message}`,
-            );
+          } catch (renameError: unknown) {
+            const msg =
+              renameError instanceof Error
+                ? renameError.message
+                : String(renameError);
+            sessionErrors.push(`Session ${index + 1} rename: ${msg}`);
           }
 
           createdCount++;
-        } catch (sessionError: any) {
-          sessionErrors.push(`Session ${index + 1}: ${sessionError.message}`);
+        } catch (sessionError: unknown) {
+          const msg =
+            sessionError instanceof Error
+              ? sessionError.message
+              : String(sessionError);
+          sessionErrors.push(`Session ${index + 1}: ${msg}`);
         }
       };
 
@@ -124,11 +137,12 @@ export const useReplaySession = (sdk: FrontendSDK) => {
         try {
           // eslint-disable-next-line compat/compat
           await Promise.all(batchPromises);
-        } catch (batchError: any) {
-          console.warn(
-            "Batch processing error (continuing):",
-            batchError.message,
-          );
+        } catch (batchError: unknown) {
+          const msg =
+            batchError instanceof Error
+              ? batchError.message
+              : String(batchError);
+          console.warn("Batch processing error (continuing):", msg);
         }
 
         if (i + batchSize < processedRequests.length) {
@@ -146,8 +160,9 @@ export const useReplaySession = (sdk: FrontendSDK) => {
       }
 
       return createdCount;
-    } catch (error: any) {
-      throw new Error(`Session creation failed: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Session creation failed: ${message}`);
     } finally {
       isCreating.value = false;
       creationProgress.value = "";

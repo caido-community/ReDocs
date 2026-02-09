@@ -21,7 +21,7 @@ export type BrunoRequest = {
   };
 };
 
-export type BrunoCollection = {
+type BrunoCollection = {
   name: string;
   description?: string;
   requests: BrunoRequest[];

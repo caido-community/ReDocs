@@ -12,10 +12,6 @@ type CollectionRequest =
   | InsomniaRequest
   | BrunoRequest;
 
-/**
- * Simple URL parser for browser environment
- * Regex groups: 1=protocol, 2=host(+port), 3=path (no leading /), 4=query (with ?)
- */
 function parseUrl(urlString: string):
   | {
       protocol: string;
@@ -56,13 +52,11 @@ function parseUrl(urlString: string):
   }
 }
 
-/**
- * Browser-compatible base64 encoding
- */
-function btoa(str: string): string {
+function btoaBase64(str: string): string {
   try {
-    if (typeof globalThis !== "undefined" && (globalThis as any).btoa) {
-      return (globalThis as any).btoa(str);
+    const g = globalThis as { btoa?: (s: string) => string };
+    if (typeof g.btoa === "function") {
+      return g.btoa(str);
     }
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -85,9 +79,6 @@ function btoa(str: string): string {
   }
 }
 
-/**
- * Creates Caido replay sessions from parsed requests
- */
 export async function createReplaySessions(
   sdk: SDK,
   requests: CollectionRequest[],
@@ -97,7 +88,7 @@ export async function createReplaySessions(
   success: boolean;
   processedRequests: Array<{
     request: CollectionRequest;
-    spec: any;
+    spec: RequestSpecData;
     sessionName: string;
   }>;
   collectionName: string;
@@ -106,7 +97,7 @@ export async function createReplaySessions(
   try {
     const processedRequests: Array<{
       request: CollectionRequest;
-      spec: any;
+      spec: RequestSpecData;
       sessionName: string;
     }> = [];
 
@@ -132,8 +123,8 @@ export async function createReplaySessions(
             sessionName,
           });
         }
-      } catch (error: any) {
-        // Skip failed requests
+      } catch {
+        void 0;
       }
     }
 
@@ -143,23 +134,33 @@ export async function createReplaySessions(
       collectionName,
       message: `Processed ${processedRequests.length} requests for session creation`,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
       processedRequests: [],
       collectionName,
-      message: `Failed to process requests: ${error.message}`,
+      message: `Failed to process requests: ${message}`,
     };
   }
 }
 
-/**
- * Builds a RequestSpec for session creation
- */
+type RequestSpecData = {
+  method: string;
+  host: string;
+  port: number;
+  path: string;
+  query: string;
+  headers: Record<string, string>;
+  body: string;
+  tls: boolean;
+  url: string;
+};
+
 async function buildRequestSpec(
   request: CollectionRequest,
   hostname?: string,
-): Promise<any | undefined> {
+): Promise<RequestSpecData | undefined> {
   try {
     let targetUrl = request.url;
 
@@ -182,14 +183,12 @@ async function buildRequestSpec(
         }
       }
     } else if (targetUrl.includes("{{") && targetUrl.includes("}}")) {
-      // Template URLs - replace with example.com if no hostname provided
       if (targetUrl.startsWith("/")) {
         targetUrl = `https://example.com${targetUrl}`;
       } else {
         targetUrl = targetUrl.replace(/\{\{[^}]+\}\}/g, "example.com");
       }
     } else if (targetUrl.startsWith("/")) {
-      // Relative URLs - use example.com if no hostname provided
       targetUrl = `https://example.com${targetUrl}`;
     }
 
@@ -199,20 +198,15 @@ async function buildRequestSpec(
 
     const urlObj = parseUrl(targetUrl);
     if (!urlObj) {
-      return null;
+      return undefined;
     }
 
-    // Build the headers object including all applied headers
     const finalHeaders = { ...request.headers };
-
-    // Handle body and determine Content-Type
     let finalBody = "";
     if ("body" in request && request.body) {
       if ("raw" in request.body && request.body.raw) {
-        // Postman-style raw body
         finalBody = request.body.raw;
       } else if ("formdata" in request.body && request.body.formdata) {
-        // Postman-style form data
         const formPairs = request.body.formdata.map(
           (item) =>
             `${encodeURIComponent(item.key)}=${encodeURIComponent(item.value || "")}`,
@@ -220,13 +214,11 @@ async function buildRequestSpec(
         finalBody = formPairs.join("&");
         finalHeaders["Content-Type"] = "application/x-www-form-urlencoded";
       } else if ("example" in request.body && request.body.example) {
-        // OpenAPI-style body with generated example
         if (request.body.contentType === "application/json") {
           finalBody = JSON.stringify(request.body.example, null, 2);
         } else if (
           request.body.contentType === "application/x-www-form-urlencoded"
         ) {
-          // Convert object to form data
           if (
             typeof request.body.example === "object" &&
             request.body.example !== null
@@ -238,21 +230,16 @@ async function buildRequestSpec(
             finalBody = formPairs.join("&");
           }
         } else {
-          // For other content types, try to stringify
           finalBody =
             typeof request.body.example === "string"
               ? request.body.example
               : JSON.stringify(request.body.example);
         }
-
-        // Ensure Content-Type header is set
         if (request.body.contentType) {
           finalHeaders["Content-Type"] = request.body.contentType;
         }
       }
     }
-
-    // Return serialized spec data that frontend can use
     return {
       method: request.method,
       host: urlObj.hostname,
@@ -268,8 +255,8 @@ async function buildRequestSpec(
       tls: urlObj.protocol === "https:",
       url: targetUrl,
     };
-  } catch (error: any) {
-    return null;
+  } catch {
+    return undefined;
   }
 }
 
@@ -366,7 +353,7 @@ function applyAuthentication(
         delete processedRequest.headers["x-api-key"];
         delete processedRequest.headers["X-Auth-Token"];
         delete processedRequest.headers["x-auth-token"];
-        const credentials = btoa(
+        const credentials = btoaBase64(
           `${authConfig.username}:${authConfig.password}`,
         );
         processedRequest.headers["Authorization"] = `Basic ${credentials}`;

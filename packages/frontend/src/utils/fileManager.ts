@@ -12,7 +12,11 @@ export const createFileManager = (sdk: FrontendSDK) => {
       const existingFiles = sdk.files.getAll();
       let counter = 0;
 
-      while (existingFiles.some((file: any) => file.name === finalFileName)) {
+      while (
+        existingFiles.some(
+          (file: { name: string }) => file.name === finalFileName,
+        )
+      ) {
         counter++;
         finalFileName = `[ReDocs] - ${baseName}-${counter}.json`;
       }
@@ -23,8 +27,9 @@ export const createFileManager = (sdk: FrontendSDK) => {
 
       await sdk.files.create(file);
       return true;
-    } catch (error: any) {
-      sdk.window.showToast(`Could not save file: ${error.message}`, {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      sdk.window.showToast(`Could not save file: ${message}`, {
         variant: "warning",
         duration: 3000,
       });

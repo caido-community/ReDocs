@@ -1,0 +1,159 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ReDocs Example API",
+    "description": "Comprehensive OpenAPI 3 spec for testing ReDocs import: GET/POST/PUT/PATCH/DELETE, query/path/header params, requestBody, securitySchemes.",
+    "version": "1.0.0"
+  },
+  "servers": [{ "url": "https://api.example.com/v1" }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    }
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "List users",
+        "operationId": "listUsers",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" }, "example": 1 },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" }, "example": 10 },
+          { "name": "sort", "in": "query", "schema": { "type": "string" }, "example": "name" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "summary": "Create user",
+        "operationId": "createUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "role": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "summary": "Get user by ID",
+        "operationId": "getUserById",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Tenant-ID", "in": "header", "schema": { "type": "string" }, "example": "tenant-123" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "put": {
+        "summary": "Update user (full)",
+        "operationId": "updateUser",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      },
+      "patch": {
+        "summary": "Patch user (partial)",
+        "operationId": "patchUser",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      },
+      "delete": {
+        "summary": "Delete user",
+        "operationId": "deleteUser",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "204": { "description": "No Content" } }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "summary": "Submit feedback (form)",
+        "operationId": "submitFeedback",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "subject": { "type": "string" },
+                  "message": { "type": "string" },
+                  "priority": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/me": {
+      "get": {
+        "summary": "Current user (protected)",
+        "operationId": "getMe",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/admin/config": {
+      "get": {
+        "summary": "Admin config (API key)",
+        "operationId": "getAdminConfig",
+        "security": [{ "apiKeyAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  }
+}

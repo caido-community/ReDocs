@@ -1,7 +1,3 @@
-# Bruno OpenCollection YAML – comprehensive test fixture for ReDocs import.
-# Covers: GET/POST/PUT/DELETE, headers, JSON body, multiline body, bearer auth, variables.
-# Use this file to verify Bruno YAML detection and parsing (see minimalYaml tests).
-
 info:
   name: Get User
   type: http
@@ -19,7 +15,7 @@ info:
   seq: 2
 http:
   method: GET
-  url: https://api.example.com/users?page=1&limit=10
+  url: https://api.example.com/users?page=1&limit=10&sort=name
   headers:
     - name: Accept
       value: application/json
@@ -39,12 +35,32 @@ http:
   body:
     type: json
     data: |
-      {"name":"Test","email":"test@example.com"}
+      {"name":"Test","email":"test@example.com","role":"admin"}
+---
+info:
+  name: Submit Form
+  type: http
+  seq: 4
+http:
+  method: POST
+  url: https://api.example.com/feedback
+  headers:
+    - name: Content-Type
+      value: application/x-www-form-urlencoded
+  body:
+    type: form
+    data:
+      - name: subject
+        value: ReDocs Test
+      - name: message
+        value: Hello world
+      - name: priority
+        value: high
 ---
 info:
   name: Update User (PUT)
   type: http
-  seq: 4
+  seq: 5
 http:
   method: PUT
   url: https://api.example.com/users/usr_123
@@ -59,7 +75,7 @@ http:
 info:
   name: Delete User
   type: http
-  seq: 5
+  seq: 6
 http:
   method: DELETE
   url: https://api.example.com/users/usr_456
@@ -68,9 +84,9 @@ http:
       value: application/json
 ---
 info:
-  name: Auth required
+  name: Auth required (Bearer)
   type: http
-  seq: 6
+  seq: 7
 http:
   method: GET
   url: https://api.example.com/me
@@ -80,3 +96,16 @@ http:
   auth:
     type: bearer
     token: "{{token}}"
+---
+info:
+  name: API Key endpoint
+  type: http
+  seq: 8
+http:
+  method: GET
+  url: https://api.example.com/admin/config
+  headers:
+    - name: X-API-Key
+      value: "{{apiKey}}"
+    - name: Accept
+      value: application/json

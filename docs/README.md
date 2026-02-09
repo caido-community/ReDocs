@@ -1,29 +1,22 @@
 # ReDocs example fixtures
 
-These files are **comprehensive test fixtures** for ReDocs import and for the Bruno OpenCollection YAML parser.
+These files are **test fixtures** for ReDocs import. Use them to verify detection and parsing for each supported format.
 
-## `example-bruno.yaml`
+| File | Format | Use |
+|------|--------|-----|
+| `example-postman.json` | Postman Collection v2.1 | Import to test Postman detection and request parsing (GET/POST, headers, body, variables). |
+| `example-openapi.json` | OpenAPI 3.0 | Import to test OpenAPI detection and path/operation parsing. |
+| `example-insomnia.json` | Insomnia export (v4) | Import to test Insomnia detection (GET/POST/PUT/DELETE, auth, form/JSON body). |
+| `example-bruno.yaml` | Bruno OpenCollection YAML | Import to test Bruno YAML detection and multi-doc parsing (headers, body, auth). |
+| `example-environment.json` | Postman environment | Import to test environment detection and variable import (with `environment` in filename). |
 
-- **Format:** Bruno OpenCollection (multi-document YAML, `---` separated).
-- **Covers:** GET, POST, PUT, DELETE; multiple headers; JSON body (including multiline `data: |`); query params; bearer auth and `{{token}}` variables.
-- **Use:** Import in ReDocs to verify Bruno YAML detection and parsing. Also exercised by `packages/backend` tests (`minimalYaml.test.ts`).
+## Running tests
 
-## `example-insomnia.json`
-
-- **Format:** Insomnia export (v4 `resources` array with Workspace and Request objects).
-- **Covers:** GET (with query and path params), POST (JSON and form body), PUT, DELETE; header formats (string and array); bearer, API key, and basic auth.
-- **Use:** Import in ReDocs to verify Insomnia detection and parsing.
-
-Run backend tests (from repo root or `packages/backend` after `pnpm install`):
+From repo root (after `pnpm install`):
 
 ```bash
-cd packages/backend && pnpm test
+pnpm test
+pnpm lint && pnpm typecheck && pnpm knip
 ```
 
-Run lint/typecheck from backend:
-
-```bash
-cd packages/backend && pnpm lint && pnpm typecheck && pnpm knip
-```
-
-From repo root, use `pnpm lint`, `pnpm typecheck` (runs all packages).
+From `packages/backend`: `pnpm lint`, `pnpm typecheck`, `pnpm knip`.
