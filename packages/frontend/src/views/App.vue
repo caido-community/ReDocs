@@ -11,6 +11,7 @@ import { useEnvironmentCreation, useRequestProcessing } from "../composables";
 import { useSDK } from "../plugins/sdk";
 import type {
   AuthConfig,
+  CollectionSourceType,
   EnvironmentVariable,
   ImportedRequest,
   ImportResult,
@@ -56,7 +57,7 @@ const collectionRequests = computed((): ImportedRequest[] => {
   );
 });
 const collectionType = computed(
-  () => (importResult.value?.type ?? "openapi") as "postman" | "openapi",
+  () => (importResult.value?.type ?? "openapi") as CollectionSourceType,
 );
 
 const environmentVariablesList = computed((): EnvironmentVariable[] => {

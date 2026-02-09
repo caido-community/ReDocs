@@ -1,8 +1,11 @@
 import type { SDK } from "caido:plugin";
 import type { AuthConfig } from "shared";
 
+import type { InsomniaRequest } from "../parsers/insomnia.js";
 import type { OpenAPIRequest } from "../parsers/openapi.js";
 import type { PostmanRequest } from "../parsers/postman.js";
+
+type CollectionRequest = PostmanRequest | OpenAPIRequest | InsomniaRequest;
 
 /**
  * Simple URL parser for browser environment
@@ -82,13 +85,13 @@ function btoa(str: string): string {
  */
 export async function createReplaySessions(
   sdk: SDK,
-  requests: (PostmanRequest | OpenAPIRequest)[],
+  requests: CollectionRequest[],
   collectionName: string,
   authConfig: AuthConfig,
 ): Promise<{
   success: boolean;
   processedRequests: Array<{
-    request: PostmanRequest | OpenAPIRequest;
+    request: CollectionRequest;
     spec: any;
     sessionName: string;
   }>;
@@ -97,7 +100,7 @@ export async function createReplaySessions(
 }> {
   try {
     const processedRequests: Array<{
-      request: PostmanRequest | OpenAPIRequest;
+      request: CollectionRequest;
       spec: any;
       sessionName: string;
     }> = [];
@@ -149,7 +152,7 @@ export async function createReplaySessions(
  * Builds a RequestSpec for session creation
  */
 async function buildRequestSpec(
-  request: PostmanRequest | OpenAPIRequest,
+  request: CollectionRequest,
   hostname?: string,
 ): Promise<any | undefined> {
   try {
@@ -265,9 +268,7 @@ async function buildRequestSpec(
   }
 }
 
-function generateCompleteSessionName(
-  request: PostmanRequest | OpenAPIRequest,
-): string {
+function generateCompleteSessionName(request: CollectionRequest): string {
   try {
     let fullPath = request.url;
 
@@ -326,9 +327,9 @@ function generateCompleteSessionName(
 }
 
 function applyAuthentication(
-  request: PostmanRequest | OpenAPIRequest,
+  request: CollectionRequest,
   authConfig: AuthConfig,
-): PostmanRequest | OpenAPIRequest {
+): CollectionRequest {
   const processedRequest = { ...request, headers: { ...request.headers } };
 
   switch (authConfig.type) {

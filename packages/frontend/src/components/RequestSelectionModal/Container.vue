@@ -7,7 +7,8 @@ import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import { computed } from "vue";
 
-import type { ImportedRequest } from "../../types/index";
+import type { CollectionSourceType, ImportedRequest } from "../../types/index";
+import { collectionTypeToLabel } from "../../types/index";
 
 import { getMethodBadgeClass, useRequestTable } from "./useRequestTable";
 
@@ -15,7 +16,7 @@ const props = defineProps<{
   visible: boolean;
   requests: ImportedRequest[];
   collectionName: string;
-  collectionType: "postman" | "openapi";
+  collectionType: CollectionSourceType;
 }>();
 
 const emit = defineEmits<{
@@ -117,7 +118,7 @@ const totalCountValue = computed(() => unwrapNumber(table.totalCount));
                   class="text-sm font-medium text-surface-600 dark:text-surface-300"
                 >
                   {{ totalCountValue }}
-                  {{ collectionType === "postman" ? "Postman" : "OpenAPI" }}
+                  {{ collectionTypeToLabel(collectionType) }}
                   requests found
                 </p>
               </div>

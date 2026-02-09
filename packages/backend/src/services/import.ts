@@ -2,6 +2,10 @@ import type { SDK } from "caido:plugin";
 import type { ImportResult } from "shared";
 
 import { parsePostmanEnvironment } from "../parsers/environment.js";
+import {
+  detectInsomniaAuth,
+  parseInsomniaExport,
+} from "../parsers/insomnia.js";
 import { detectOpenAPIAuth, parseOpenAPISpec } from "../parsers/openapi.js";
 import {
   detectPostmanAuth,
@@ -65,6 +69,22 @@ export const processImportFile = async (
         requests: spec.requests,
         authentication: authInfo,
         message: `Successfully parsed OpenAPI specification "${spec.name}" with ${spec.requests.length} requests`,
+      };
+    }
+
+    if (detectionResult.type === "insomnia") {
+      const collection = await parseInsomniaExport(sdk, fileContent);
+      const authInfo = detectInsomniaAuth(collection);
+
+      return {
+        success: true,
+        type: "insomnia",
+        collectionName: collection.name,
+        description: collection.description,
+        sessionCount: collection.requests.length,
+        requests: collection.requests,
+        authentication: authInfo,
+        message: `Successfully parsed Insomnia export "${collection.name}" with ${collection.requests.length} requests`,
       };
     }
 

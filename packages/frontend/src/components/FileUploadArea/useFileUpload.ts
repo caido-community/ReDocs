@@ -7,6 +7,7 @@ const SUPPORTED_EXTENSIONS = [".json"];
 export const supportedFormats = [
   "Postman Collection (.json)",
   "OpenAPI Specification (.json only)",
+  "Insomnia Export (.json)",
   "Postman Environment (.json)",
 ];
 

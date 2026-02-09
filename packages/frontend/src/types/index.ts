@@ -35,3 +35,18 @@ export type RequestSpec = {
 };
 
 export type PageType = "Import" | "Docs";
+
+export type CollectionSourceType = "postman" | "openapi" | "insomnia";
+
+export function collectionTypeToLabel(type: CollectionSourceType): string {
+  switch (type) {
+    case "postman":
+      return "Postman";
+    case "openapi":
+      return "OpenAPI";
+    case "insomnia":
+      return "Insomnia";
+    default:
+      return "Collection";
+  }
+}

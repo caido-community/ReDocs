@@ -6,8 +6,8 @@ import { isPostmanEnvironment } from "../parsers/environment.js";
  * File type detection result
  */
 export interface FileTypeResult {
-  type: "postman" | "openapi" | "environment" | "unknown";
-  confidence: number; // 0-1 confidence score
+  type: "postman" | "openapi" | "environment" | "insomnia" | "unknown";
+  confidence: number;
   details: string;
 }
 
@@ -54,6 +54,14 @@ export function detectFileType(
       };
     }
 
+    if (isInsomniaExport(data)) {
+      return {
+        type: "insomnia",
+        confidence: 0.95,
+        details: "Insomnia export detected - contains request resources",
+      };
+    }
+
     const fileTypeFromName = detectFromFilename(fileName);
     if (fileTypeFromName !== "unknown") {
       return {
@@ -67,7 +75,7 @@ export function detectFileType(
       type: "unknown",
       confidence: 0,
       details:
-        "Valid JSON but does not match Postman collection or OpenAPI specification format",
+        "Valid JSON but does not match Postman collection, OpenAPI specification, or Insomnia export format",
     };
   } catch (jsonError: any) {
     // If JSON parsing fails, check for YAML but reject it
@@ -169,6 +177,18 @@ function isOpenAPISpec(data: any): boolean {
   return false;
 }
 
+function isInsomniaExport(data: Record<string, unknown>): boolean {
+  if (!data || typeof data !== "object") return false;
+  const resources = data.resources;
+  if (!Array.isArray(resources) || resources.length === 0) return false;
+  const hasRequest = resources.some((r) => {
+    if (r === undefined || r === null || typeof r !== "object") return false;
+    const t = (r as Record<string, unknown>)._type;
+    return typeof t === "string" && t.toLowerCase() === "request";
+  });
+  return hasRequest;
+}
+
 /**
  * Attempts to detect file type from filename patterns
  * @param fileName - Original file name
@@ -176,8 +196,16 @@ function isOpenAPISpec(data: any): boolean {
  */
 function detectFromFilename(
   fileName: string,
-): "postman" | "openapi" | "environment" | "unknown" {
+): "postman" | "openapi" | "environment" | "insomnia" | "unknown" {
   const lowerName = fileName.toLowerCase();
+
+  const insomniaPatterns = ["insomnia", "export"];
+
+  for (const pattern of insomniaPatterns) {
+    if (lowerName.includes(pattern)) {
+      return "insomnia";
+    }
+  }
 
   // Postman environment patterns
   const environmentPatterns = [
@@ -282,7 +310,7 @@ function isLikelyYAML(content: string, fileName: string): boolean {
  * @returns Validation result with support info
  */
 export function validateFileTypeSupport(
-  fileType: "postman" | "openapi" | "environment" | "unknown",
+  fileType: "postman" | "openapi" | "environment" | "insomnia" | "unknown",
   fileName: string,
 ): {
   supported: boolean;
@@ -293,6 +321,12 @@ export function validateFileTypeSupport(
       return {
         supported: true,
         message: "Postman collections are fully supported",
+      };
+
+    case "insomnia":
+      return {
+        supported: true,
+        message: "Insomnia exports are fully supported",
       };
 
     case "openapi": {
@@ -323,7 +357,7 @@ export function validateFileTypeSupport(
       return {
         supported: false,
         message:
-          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, or Postman environment (.json)",
+          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, Insomnia export, or Postman environment (.json)",
       };
   }
 }
