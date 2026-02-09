@@ -1,6 +1,10 @@
 import type { SDK } from "caido:plugin";
 import type { ImportResult } from "shared";
 
+import {
+  detectBrunoAuth,
+  parseBrunoOpenCollectionYaml,
+} from "../parsers/brunoYaml.js";
 import { parsePostmanEnvironment } from "../parsers/environment.js";
 import {
   detectInsomniaAuth,
@@ -88,6 +92,26 @@ export const processImportFile = async (
       };
     }
 
+    if (detectionResult.type === "bruno") {
+      const collection = await parseBrunoOpenCollectionYaml(
+        sdk,
+        fileContent,
+        fileName,
+      );
+      const authInfo = detectBrunoAuth(collection);
+
+      return {
+        success: true,
+        type: "bruno",
+        collectionName: collection.name,
+        description: collection.description,
+        sessionCount: collection.requests.length,
+        requests: collection.requests,
+        authentication: authInfo,
+        message: `Successfully parsed Bruno OpenCollection "${collection.name}" with ${collection.requests.length} requests`,
+      };
+    }
+
     if (detectionResult.type === "environment") {
       const environment = await parsePostmanEnvironment(sdk, fileContent);
 
@@ -103,11 +127,12 @@ export const processImportFile = async (
     }
 
     throw new Error(`Unsupported file type: ${detectionResult.type}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message,
-      message: `Failed to process ${fileName}: ${error.message}`,
+      error: message,
+      message: `Failed to process ${fileName}: ${message}`,
     };
   }
 };

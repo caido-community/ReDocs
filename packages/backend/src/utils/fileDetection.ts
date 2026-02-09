@@ -2,11 +2,19 @@ import type { SDK } from "caido:plugin";
 
 import { isPostmanEnvironment } from "../parsers/environment.js";
 
+import { parseFirstDocument } from "./minimalYaml.js";
+
 /**
  * File type detection result
  */
 export interface FileTypeResult {
-  type: "postman" | "openapi" | "environment" | "insomnia" | "unknown";
+  type:
+    | "postman"
+    | "openapi"
+    | "environment"
+    | "insomnia"
+    | "bruno"
+    | "unknown";
   confidence: number;
   details: string;
 }
@@ -77,42 +85,69 @@ export function detectFileType(
       details:
         "Valid JSON but does not match Postman collection, OpenAPI specification, or Insomnia export format",
     };
-  } catch (jsonError: any) {
-    // If JSON parsing fails, check for YAML but reject it
+  } catch (jsonError: unknown) {
     if (isLikelyYAML(content, fileName)) {
+      const yamlData = parseFirstDocument(content);
+      if (yamlData !== undefined && isBrunoOpenCollectionYaml(yamlData)) {
+        return {
+          type: "bruno",
+          confidence: 0.95,
+          details: "Bruno OpenCollection YAML detected",
+        };
+      }
       return {
         type: "unknown",
         confidence: 0,
         details:
-          "YAML files are not currently supported. Please convert to JSON format.",
+          "YAML format not recognized. Use Bruno OpenCollection YAML (.yaml/.yml) with info and http sections.",
       };
     }
 
+    const message =
+      jsonError instanceof Error ? jsonError.message : String(jsonError);
     return {
       type: "unknown",
       confidence: 0,
-      details: `File is not valid JSON and does not appear to be YAML: ${jsonError.message}`,
+      details: `File is not valid JSON and does not appear to be YAML: ${message}`,
     };
   }
 }
 
-/**
- * Checks if the parsed JSON object represents a Postman collection
- * @param data - Parsed JSON data
- * @returns True if this appears to be a Postman collection
- */
+function isBrunoOpenCollectionYaml(data: unknown): boolean {
+  const doc = Array.isArray(data) ? data[0] : data;
+  if (doc === undefined || doc === null || typeof doc !== "object")
+    return false;
+  const o = doc as Record<string, unknown>;
+  const info = o.info;
+  const http = o.http;
+  if (
+    info === undefined ||
+    info === null ||
+    typeof info !== "object" ||
+    http === undefined ||
+    http === null ||
+    typeof http !== "object"
+  )
+    return false;
+  const infoObj = info as Record<string, unknown>;
+  const httpObj = http as Record<string, unknown>;
+  const type = infoObj.type;
+  const method = httpObj.method;
+  const url = httpObj.url;
+  return (
+    type === "http" && typeof method === "string" && typeof url === "string"
+  );
+}
+
 function isPostmanCollection(data: any): boolean {
-  // Check for required Postman collection fields
   if (!data.info || typeof data.info !== "object") {
     return false;
   }
 
-  // Postman collections must have info.name
   if (!data.info.name || typeof data.info.name !== "string") {
     return false;
   }
 
-  // Check for other Postman-specific indicators
   const hasPostmanSchema =
     data.info.schema &&
     typeof data.info.schema === "string" &&
@@ -123,34 +158,24 @@ function isPostmanCollection(data: any): boolean {
   const hasPostmanVersion =
     data.info._postman_id || data.info.version || hasPostmanSchema;
 
-  // Must have either the schema indicator or the typical structure
   return hasPostmanSchema || (hasPostmanStructure && hasPostmanVersion);
 }
 
-/**
- * Checks if the parsed JSON object represents an OpenAPI specification
- * @param data - Parsed JSON data
- * @returns True if this appears to be an OpenAPI specification
- */
 function isOpenAPISpec(data: any): boolean {
-  // Check for OpenAPI 3.x version
   if (data.openapi && typeof data.openapi === "string") {
     return data.openapi.startsWith("3.");
   }
 
-  // Check for Swagger 2.x version
   if (data.swagger && typeof data.swagger === "string") {
     return data.swagger.startsWith("2.");
   }
 
-  // Additional checks for OpenAPI structure without version field
   if (
     data.info &&
     data.paths &&
     typeof data.info === "object" &&
     typeof data.paths === "object"
   ) {
-    // Check if paths object contains HTTP methods
     const pathKeys = Object.keys(data.paths);
     if (pathKeys.length > 0 && pathKeys[0]) {
       const firstPath = data.paths[pathKeys[0]];
@@ -189,15 +214,15 @@ function isInsomniaExport(data: Record<string, unknown>): boolean {
   return hasRequest;
 }
 
-/**
- * Attempts to detect file type from filename patterns
- * @param fileName - Original file name
- * @returns Detected file type or 'unknown'
- */
 function detectFromFilename(
   fileName: string,
-): "postman" | "openapi" | "environment" | "insomnia" | "unknown" {
+): "postman" | "openapi" | "environment" | "insomnia" | "bruno" | "unknown" {
   const lowerName = fileName.toLowerCase();
+
+  const brunoPatterns = ["bruno", "opencollection"];
+  for (const pattern of brunoPatterns) {
+    if (lowerName.includes(pattern)) return "bruno";
+  }
 
   const insomniaPatterns = ["insomnia", "export"];
 
@@ -207,7 +232,6 @@ function detectFromFilename(
     }
   }
 
-  // Postman environment patterns
   const environmentPatterns = [
     "environment",
     "env",
@@ -222,7 +246,6 @@ function detectFromFilename(
     }
   }
 
-  // Postman collection patterns
   const postmanPatterns = [
     "postman_collection",
     "collection",
@@ -258,20 +281,13 @@ function detectFromFilename(
     }
   }
 
-  // File extension hints
   if (lowerName.endsWith(".yaml") || lowerName.endsWith(".yml")) {
-    return "openapi"; // Most YAML API files are OpenAPI specs
+    return "openapi";
   }
 
   return "unknown";
 }
 
-/**
- * Checks if content appears to be YAML format
- * @param content - Raw file content
- * @param fileName - File name for additional context
- * @returns True if this appears to be YAML
- */
 function isLikelyYAML(content: string, fileName: string): boolean {
   // Check file extension
   if (
@@ -281,12 +297,11 @@ function isLikelyYAML(content: string, fileName: string): boolean {
     return true;
   }
 
-  // Check for YAML indicators in content
   const yamlIndicators = [
-    /^---\s*$/m, // Document separator
-    /^\s*\w+:\s*$/m, // Key followed by colon
-    /^\s*-\s+/m, // List items
-    /^\s*[\w-]+:\s+[\w-]/m, // Key-value pairs
+    /^---\s*$/m,
+    /^\s*\w+:\s*$/m,
+    /^\s*-\s+/m,
+    /^\s*[\w-]+:\s+[\w-]/m,
   ];
 
   let indicatorCount = 0;
@@ -296,21 +311,20 @@ function isLikelyYAML(content: string, fileName: string): boolean {
     }
   }
 
-  // If we have multiple YAML indicators and no JSON indicators, likely YAML
   const hasJsonIndicators =
     content.trim().startsWith("{") || content.trim().startsWith("[");
 
   return indicatorCount >= 2 && !hasJsonIndicators;
 }
 
-/**
- * Validates that the detected file type can be processed
- * @param fileType - Detected file type
- * @param fileName - Original file name
- * @returns Validation result with support info
- */
 export function validateFileTypeSupport(
-  fileType: "postman" | "openapi" | "environment" | "insomnia" | "unknown",
+  fileType:
+    | "postman"
+    | "openapi"
+    | "environment"
+    | "insomnia"
+    | "bruno"
+    | "unknown",
   fileName: string,
 ): {
   supported: boolean;
@@ -327,6 +341,12 @@ export function validateFileTypeSupport(
       return {
         supported: true,
         message: "Insomnia exports are fully supported",
+      };
+
+    case "bruno":
+      return {
+        supported: true,
+        message: "Bruno OpenCollection YAML is fully supported",
       };
 
     case "openapi": {
@@ -357,7 +377,7 @@ export function validateFileTypeSupport(
       return {
         supported: false,
         message:
-          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, Insomnia export, or Postman environment (.json)",
+          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, Insomnia export, Bruno OpenCollection YAML, or Postman environment (.json)",
       };
   }
 }

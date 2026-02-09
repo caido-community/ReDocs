@@ -2,12 +2,13 @@ import { ref } from "vue";
 
 import type { FrontendSDK } from "../../types.js";
 
-const SUPPORTED_EXTENSIONS = [".json"];
+const SUPPORTED_EXTENSIONS = [".json", ".yaml", ".yml"];
 
 export const supportedFormats = [
   "Postman Collection (.json)",
   "OpenAPI Specification (.json only)",
   "Insomnia Export (.json)",
+  "Bruno OpenCollection (.yaml, .yml)",
   "Postman Environment (.json)",
 ];
 

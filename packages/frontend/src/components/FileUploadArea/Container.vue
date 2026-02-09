@@ -84,7 +84,7 @@ const isDragOver = computed(() => upload.isDragOver());
           <FileUpload
             mode="basic"
             name="importFile"
-            accept=".json"
+            accept=".json,.yaml,.yml"
             :multiple="false"
             :auto="false"
             choose-label="Choose File"

@@ -36,7 +36,7 @@ export type RequestSpec = {
 
 export type PageType = "Import" | "Docs";
 
-export type CollectionSourceType = "postman" | "openapi" | "insomnia";
+export type CollectionSourceType = "postman" | "openapi" | "insomnia" | "bruno";
 
 export function collectionTypeToLabel(type: CollectionSourceType): string {
   switch (type) {
@@ -46,6 +46,8 @@ export function collectionTypeToLabel(type: CollectionSourceType): string {
       return "OpenAPI";
     case "insomnia":
       return "Insomnia";
+    case "bruno":
+      return "Bruno";
     default:
       return "Collection";
   }

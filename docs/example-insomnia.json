@@ -7,7 +7,7 @@
       "_id": "wrk_workspace_1",
       "_type": "Workspace",
       "name": "ReDocs Example API",
-      "description": "Sample Insomnia export for testing ReDocs import"
+      "description": "Comprehensive Insomnia export for testing ReDocs import: GET/POST/PUT/DELETE, query/path params, JSON and form bodies, bearer/apikey/basic auth."
     },
     {
       "_id": "req_get_users",

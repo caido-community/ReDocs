@@ -73,9 +73,8 @@ export const useDocContent = () => {
       title: "Bruno",
       color: "text-primary-400",
       items: [
-        "Share → Export as Postman Collection or OpenAPI",
-        "Import the exported file into ReDocs",
-        "No native .bru import yet; use export path above",
+        "OpenCollection YAML (.yaml, .yml): import directly",
+        "Or Share → Export as Postman/OpenAPI, then import",
       ],
     },
     {

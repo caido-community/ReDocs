@@ -1,11 +1,16 @@
 import type { SDK } from "caido:plugin";
 import type { AuthConfig } from "shared";
 
+import type { BrunoRequest } from "../parsers/brunoYaml.js";
 import type { InsomniaRequest } from "../parsers/insomnia.js";
 import type { OpenAPIRequest } from "../parsers/openapi.js";
 import type { PostmanRequest } from "../parsers/postman.js";
 
-type CollectionRequest = PostmanRequest | OpenAPIRequest | InsomniaRequest;
+type CollectionRequest =
+  | PostmanRequest
+  | OpenAPIRequest
+  | InsomniaRequest
+  | BrunoRequest;
 
 /**
  * Simple URL parser for browser environment
