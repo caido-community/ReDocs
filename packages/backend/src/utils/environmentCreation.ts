@@ -1,25 +1,19 @@
 import type { SDK } from "caido:plugin";
 
-/**
- * Interface for environment variable creation
- */
-export interface CaidoEnvironmentVariable {
+type CaidoEnvironmentVariable = {
   name: string;
   value: string;
   secret: boolean;
   global?: boolean;
-}
+};
 
-/**
- * Result interface for environment creation
- */
-export interface EnvironmentCreationResult {
+type EnvironmentCreationResult = {
   success: boolean;
   environmentName: string;
   variablesCreated: number;
   message: string;
   error?: string;
-}
+};
 
 /**
  * Create environment variables in Caido
@@ -149,7 +143,6 @@ export function convertToCaidoVariables(
     isSecret: boolean;
   }>,
 ): CaidoEnvironmentVariable[] {
-  // Note: Using global console.log since we don't have SDK access here
   const filtered = environmentVariables.filter((variable) => variable.enabled);
 
   const converted = filtered.map((variable) => ({

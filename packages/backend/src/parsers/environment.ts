@@ -1,18 +1,11 @@
 import type { SDK } from "caido:plugin";
+import type { EnvironmentVariable } from "shared";
 
-export interface EnvironmentVariable {
-  key: string;
-  value: string;
-  enabled: boolean;
-  type: "default" | "secret";
-  isSecret?: boolean;
-}
-
-export interface PostmanEnvironment {
+export type PostmanEnvironment = {
   name: string;
   description?: string;
   variables: EnvironmentVariable[];
-}
+};
 
 const SENSITIVE_KEYWORDS = [
   "token",

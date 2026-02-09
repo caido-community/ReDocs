@@ -1,10 +1,12 @@
 import type { SDK } from "caido:plugin";
+import type { AuthConfig } from "shared";
 
 import type { OpenAPIRequest } from "../parsers/openapi.js";
 import type { PostmanRequest } from "../parsers/postman.js";
 
 /**
  * Simple URL parser for browser environment
+ * Regex groups: 1=protocol, 2=host(+port), 3=path (no leading /), 4=query (with ?)
  */
 function parseUrl(urlString: string):
   | {
@@ -22,12 +24,24 @@ function parseUrl(urlString: string):
 
     if (!match || !match[1] || !match[2]) return undefined;
 
+    const hostPart = match[2];
+    const portMatch = hostPart.includes(":")
+      ? hostPart.split(":")
+      : [hostPart, undefined];
+    const hostname = portMatch[0] ?? hostPart;
+    const port = portMatch[1];
+
+    const pathPart = match[3];
+    const pathname =
+      pathPart !== undefined && pathPart !== "" ? "/" + pathPart : "/";
+    const search = match[4] ?? undefined;
+
     return {
       protocol: match[1] + ":",
-      hostname: match[2],
-      port: match[3] || undefined,
-      pathname: match[4] || "/",
-      search: match[5] || undefined,
+      hostname,
+      port,
+      pathname,
+      search,
     };
   } catch {
     return undefined;
@@ -61,20 +75,6 @@ function btoa(str: string): string {
   } catch {
     return "";
   }
-}
-
-/**
- * Authentication configuration for applying to requests
- */
-export interface AuthConfig {
-  type: "none" | "apikey" | "bearer" | "basic" | "custom";
-  key?: string;
-  value?: string;
-  token?: string;
-  username?: string;
-  password?: string;
-  header?: string;
-  hostname?: string;
 }
 
 /**

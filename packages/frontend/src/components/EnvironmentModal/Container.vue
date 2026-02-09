@@ -7,177 +7,96 @@ import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import Dropdown from "primevue/dropdown";
 import InputText from "primevue/inputtext";
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
+
+import type { EnvironmentVariable } from "../../types/index";
+
+import { useEnvironmentTable } from "./useEnvironmentTable";
 
 const props = defineProps<{
   visible: boolean;
-  variables: Array<any>;
+  variables: EnvironmentVariable[];
   environmentName: string;
 }>();
 
 const emit = defineEmits<{
   "update:visible": [value: boolean];
   "variables-selected": [
-    selectedVariables: Array<any>,
+    selectedVariables: EnvironmentVariable[],
     environmentName: string,
   ];
   "selection-cancelled": [];
 }>();
 
-const selectedVariables = ref<Set<string>>(new Set());
-const editableVariables = ref<Map<string, any>>(new Map());
-
-const variableTypeOptions = [
-  { label: "Plain Text", value: "plain" },
-  { label: "Secret", value: "secret" },
-];
+const table = useEnvironmentTable(
+  () => props.variables,
+  () => props.environmentName,
+  (selected, envName) => emit("variables-selected", selected, envName),
+  () => emit("selection-cancelled"),
+  () => emit("update:visible", false),
+);
 
 const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit("update:visible", value),
 });
 
-const tableData = computed(() => {
-  const currentSelection = selectedVariables.value;
-  const usedIds = new Set<string>();
+const variableTypeOptions = [
+  { label: "Plain Text", value: "plain" },
+  { label: "Secret", value: "secret" },
+];
 
-  return props.variables.map((variable, index) => {
-    let variableId = variable.key || `var_${index}_${variable.key}`;
-
-    let counter = 0;
-    let originalId = variableId;
-    while (usedIds.has(variableId)) {
-      counter++;
-      variableId = `${originalId}_${counter}`;
-    }
-    usedIds.add(variableId);
-
-    const editableVar = editableVariables.value.get(variableId) || variable;
-
-    return {
-      id: variableId,
-      key: editableVar.key || variable.key,
-      value: editableVar.value || variable.value,
-      enabled:
-        editableVar.enabled !== undefined
-          ? editableVar.enabled
-          : variable.enabled,
-      isSecret:
-        editableVar.isSecret !== undefined
-          ? editableVar.isSecret
-          : variable.isSecret,
-      selected: currentSelection.has(variableId),
-      originalVariable: variable,
-    };
-  });
+const tableRows = computed(() => {
+  const refOrArray = table.tableData;
+  const value =
+    typeof refOrArray === "object" &&
+    refOrArray !== null &&
+    "value" in refOrArray
+      ? (refOrArray as { value: unknown }).value
+      : refOrArray;
+  return Array.isArray(value) ? value : [];
 });
 
-const selectedCount = computed(() => selectedVariables.value.size);
-const totalCount = computed(() => props.variables.length);
+const unwrap = (r: unknown): boolean => {
+  if (r !== undefined && r !== null && typeof r === "object" && "value" in r) {
+    return (r as { value: boolean }).value;
+  }
+  return Boolean(r);
+};
 
-const selectAll = computed({
-  get: () => {
-    const tableItems = tableData.value;
-    const selection = selectedVariables.value;
-    return (
-      tableItems.length > 0 &&
-      tableItems.every((item) => selection.has(item.id))
-    );
-  },
-  set: (value: boolean) => {
-    const tableItems = tableData.value;
-    if (value) {
-      selectedVariables.value = new Set(tableItems.map((item) => item.id));
-    } else {
-      selectedVariables.value = new Set();
+const selectAllChecked = computed({
+  get: () => unwrap(table.selectAll),
+  set: (v: boolean) => {
+    const ref = table.selectAll as { value: boolean };
+    if (ref !== undefined && ref !== null && "value" in ref) {
+      ref.value = v;
     }
   },
 });
 
-watch(
-  () => props.variables,
-  (newVariables) => {
-    if (newVariables && newVariables.length > 0) {
-      const usedIds = new Set<string>();
-      const newSelection = new Set<string>();
-      const newEditableVars = new Map<string, any>();
-
-      newVariables.forEach((variable, index) => {
-        let variableId = variable.key || `var_${index}_${variable.key}`;
-
-        let counter = 0;
-        let originalId = variableId;
-        while (usedIds.has(variableId)) {
-          counter++;
-          variableId = `${originalId}_${counter}`;
-        }
-        usedIds.add(variableId);
-        newSelection.add(variableId);
-        newEditableVars.set(variableId, { ...variable });
-      });
-
-      selectedVariables.value = newSelection;
-      editableVariables.value = newEditableVars;
-    }
-  },
-  { immediate: true },
+const isContinueDisabledValue = computed(() =>
+  unwrap(table.isContinueDisabled),
 );
 
-const handleVariableSelection = (
-  variableId: string,
-  selected: boolean | any,
-) => {
-  const newSelection = new Set(selectedVariables.value);
-
-  if (selected) {
-    newSelection.add(variableId);
-  } else {
-    newSelection.delete(variableId);
+const selectedCountValue = computed(() => {
+  const v = table.selectedCount;
+  if (typeof v === "number") return v;
+  if (v !== undefined && v !== null && typeof v === "object" && "value" in v) {
+    const val = (v as { value: number }).value;
+    return typeof val === "number" ? val : 0;
   }
+  return 0;
+});
 
-  selectedVariables.value = newSelection;
-};
-
-const handleRowClick = (rowData: any) => {
-  const isSelected = selectedVariables.value.has(rowData.id);
-  handleVariableSelection(rowData.id, !isSelected);
-};
-
-const updateVariable = (variableId: string, field: string, value: any) => {
-  const current = editableVariables.value.get(variableId) || {};
-  const updated = { ...current, [field]: value };
-  editableVariables.value.set(variableId, updated);
-  editableVariables.value = new Map(editableVariables.value);
-};
-
-const handleSecretTypeChange = (variableId: string, value: string) => {
-  updateVariable(variableId, "isSecret", value === "secret");
-};
-
-const handleContinue = () => {
-  const tableItems = tableData.value;
-  const selected = tableItems
-    .filter((item) => selectedVariables.value.has(item.id))
-    .map((item) => ({
-      key: item.key,
-      value: item.value,
-      enabled: item.enabled,
-      isSecret: item.isSecret,
-      originalVariable: item.originalVariable,
-    }));
-
-  emit("variables-selected", selected, props.environmentName);
-  closeModal();
-};
-
-const handleCancel = () => {
-  emit("selection-cancelled");
-  closeModal();
-};
-
-const closeModal = () => {
-  dialogVisible.value = false;
-};
+const totalCountValue = computed(() => {
+  const v = table.totalCount;
+  if (typeof v === "number") return v;
+  if (v !== undefined && v !== null && typeof v === "object" && "value" in v) {
+    const val = (v as { value: number }).value;
+    return typeof val === "number" ? val : 0;
+  }
+  return 0;
+});
 </script>
 
 <template>
@@ -216,7 +135,7 @@ const closeModal = () => {
                 <p
                   class="text-sm font-medium text-surface-600 dark:text-surface-300"
                 >
-                  {{ totalCount }} environment variables found
+                  {{ totalCountValue }} environment variables found
                 </p>
               </div>
             </div>
@@ -225,7 +144,7 @@ const closeModal = () => {
               <p
                 class="text-sm font-medium text-surface-900 dark:text-surface-0"
               >
-                {{ selectedCount }} of {{ totalCount }} selected
+                {{ selectedCountValue }} of {{ totalCountValue }} selected
               </p>
             </div>
           </div>
@@ -242,15 +161,15 @@ const closeModal = () => {
 
             <div class="flex items-center gap-2">
               <Checkbox
-                v-model="selectAll"
+                v-model="selectAllChecked"
                 binary
                 class="select-all-checkbox"
               />
               <label
                 class="text-sm font-medium text-surface-900 dark:text-surface-0 cursor-pointer"
-                @click="selectAll = !selectAll"
+                @click="table.toggleSelectAll()"
               >
-                {{ selectAll ? "Unselect All" : "Select All" }}
+                {{ selectAllChecked ? "Unselect All" : "Select All" }}
               </label>
             </div>
           </div>
@@ -258,7 +177,8 @@ const closeModal = () => {
         <template #content>
           <div class="rounded-md overflow-hidden border border-surface-600">
             <DataTable
-              :value="tableData"
+              :value="tableRows"
+              data-key="id"
               scrollable
               scroll-height="400px"
               :rows="50"
@@ -268,12 +188,12 @@ const closeModal = () => {
             >
               <Column header="" :style="{ width: '60px' }">
                 <template #body="{ data }">
-                  <div class="flex justify-center" @click.stop>
+                  <div v-if="data" class="flex justify-center" @click.stop>
                     <Checkbox
                       :model-value="data.selected"
                       binary
                       @update:model-value="
-                        (value) => handleVariableSelection(data.id, value)
+                        (value) => table.handleVariableSelection(data.id, value)
                       "
                     />
                   </div>
@@ -282,13 +202,17 @@ const closeModal = () => {
 
               <Column header="Variable Name" :style="{ minWidth: '200px' }">
                 <template #body="{ data }">
-                  <div class="cursor-pointer" @click="handleRowClick(data)">
+                  <div
+                    v-if="data"
+                    class="cursor-pointer"
+                    @click="table.handleRowClick(data)"
+                  >
                     <InputText
                       :model-value="data.key"
                       class="w-full"
                       size="small"
                       @update:model-value="
-                        (value) => updateVariable(data.id, 'key', value)
+                        (value) => table.updateVariable(data.id, 'key', value)
                       "
                       @click.stop
                     />
@@ -298,7 +222,11 @@ const closeModal = () => {
 
               <Column header="Value" :style="{ minWidth: '250px' }">
                 <template #body="{ data }">
-                  <div class="cursor-pointer" @click="handleRowClick(data)">
+                  <div
+                    v-if="data"
+                    class="cursor-pointer"
+                    @click="table.handleRowClick(data)"
+                  >
                     <InputText
                       :model-value="data.value"
                       :type="data.isSecret ? 'password' : 'text'"
@@ -306,7 +234,7 @@ const closeModal = () => {
                       size="small"
                       placeholder="Enter variable value..."
                       @update:model-value="
-                        (value) => updateVariable(data.id, 'value', value)
+                        (value) => table.updateVariable(data.id, 'value', value)
                       "
                       @click.stop
                     />
@@ -316,7 +244,11 @@ const closeModal = () => {
 
               <Column header="Type" :style="{ width: '140px' }">
                 <template #body="{ data }">
-                  <div class="cursor-pointer" @click="handleRowClick(data)">
+                  <div
+                    v-if="data"
+                    class="cursor-pointer"
+                    @click="table.handleRowClick(data)"
+                  >
                     <Dropdown
                       :model-value="data.isSecret ? 'secret' : 'plain'"
                       :options="variableTypeOptions"
@@ -325,7 +257,7 @@ const closeModal = () => {
                       class="w-full"
                       size="small"
                       @update:model-value="
-                        (value) => handleSecretTypeChange(data.id, value)
+                        (value) => table.handleSecretTypeChange(data.id, value)
                       "
                       @click.stop
                     />
@@ -335,7 +267,11 @@ const closeModal = () => {
 
               <Column header="Status" :style="{ width: '100px' }">
                 <template #body="{ data }">
-                  <div class="cursor-pointer" @click="handleRowClick(data)">
+                  <div
+                    v-if="data"
+                    class="cursor-pointer"
+                    @click="table.handleRowClick(data)"
+                  >
                     <div class="flex items-center gap-2">
                       <i
                         :class="
@@ -365,7 +301,7 @@ const closeModal = () => {
     <template #footer>
       <div class="flex justify-between items-center px-6 py-4">
         <span class="text-sm text-surface-600 dark:text-surface-300 pr-4">
-          {{ selectedCount }} variables will be imported into:
+          {{ selectedCountValue }} variables will be imported into:
           <span class="text-secondary-400 font-mono"
             >[ReDocs]-{{ environmentName }}</span
           >
@@ -376,16 +312,16 @@ const closeModal = () => {
             label="Cancel Import"
             severity="secondary"
             class="flex items-center gap-2"
-            @click="handleCancel"
+            @click="table.handleCancel"
           >
             <template #icon><i class="fas fa-times"></i></template>
           </Button>
 
           <Button
-            :label="`Import ${selectedCount} Variables`"
-            :disabled="selectedCount === 0"
+            :label="`Import ${selectedCountValue} Variables`"
+            :disabled="isContinueDisabledValue"
             class="flex items-center gap-2"
-            @click="handleContinue"
+            @click="table.handleContinue"
           >
             <template #icon><i class="fas fa-check"></i></template>
           </Button>

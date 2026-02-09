@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import MenuBar from "primevue/menubar";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 import { AuthenticationModal } from "../components/AuthenticationModal";
 import { DocumentationTab } from "../components/DocumentationTab";
 import { EnvironmentModal } from "../components/EnvironmentModal";
 import { FileUploadArea } from "../components/FileUploadArea";
 import { RequestSelectionModal } from "../components/RequestSelectionModal";
+import { useEnvironmentCreation, useRequestProcessing } from "../composables";
 import { useSDK } from "../plugins/sdk";
+import type {
+  AuthConfig,
+  EnvironmentVariable,
+  ImportedRequest,
+  ImportResult,
+  PageType,
+} from "../types/";
 
 const sdk = useSDK();
 
-const page = ref<"Import" | "Docs">("Import");
+const page = ref<PageType>("Import");
 const items = [
   {
     label: "Import",
@@ -30,48 +38,53 @@ const items = [
 const showRequestSelection = ref(false);
 const showAuthentication = ref(false);
 const showEnvironment = ref(false);
-const importResult = ref<any>(null);
-const selectedRequests = ref<any[]>([]);
-const environmentVariables = ref<any[]>([]);
+const importResult = ref<ImportResult | undefined>(undefined);
+const selectedRequests = ref<ImportedRequest[]>([]);
+const environmentVariables = ref<EnvironmentVariable[]>([]);
 const environmentName = ref("");
-const isProcessing = ref(false);
-const processingStep = ref("");
 
-const saveFileToUserFiles = async (
-  fileName: string,
-  content: string,
-): Promise<boolean> => {
-  try {
-    const baseName = fileName.replace(/\.json$/i, "");
-    let finalFileName = `[ReDocs]-${baseName}.json`;
+const environmentCreation = useEnvironmentCreation(sdk);
+const requestProcessing = useRequestProcessing(sdk);
 
-    const existingFiles = sdk.files.getAll();
-    let counter = 0;
+const collectionRequests = computed((): ImportedRequest[] => {
+  const raw = importResult.value?.requests;
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (r): r is ImportedRequest =>
+      r !== undefined && r !== null && typeof r === "object",
+  );
+});
+const collectionType = computed(
+  () => (importResult.value?.type ?? "openapi") as "postman" | "openapi",
+);
 
-    while (existingFiles.some((file: any) => file.name === finalFileName)) {
-      counter++;
-      finalFileName = `[ReDocs] - ${baseName}-${counter}.json`;
-    }
+const environmentVariablesList = computed((): EnvironmentVariable[] => {
+  const raw = environmentVariables.value;
+  if (raw === undefined || raw === null || !Array.isArray(raw)) return [];
+  return raw.filter(
+    (v): v is EnvironmentVariable =>
+      v !== undefined &&
+      v !== null &&
+      typeof v === "object" &&
+      "key" in v &&
+      "value" in v,
+  );
+});
 
-    const file = new File([content], finalFileName, {
-      type: "application/json",
-    });
-
-    await sdk.files.create(file);
-    return true;
-  } catch (error: any) {
-    if (sdk.window?.showToast) {
-      sdk.window.showToast(`Could not save file: ${error.message}`, {
-        variant: "warning",
-        duration: 3000,
-      });
-    }
-    return false;
-  }
-};
+const isProcessing = computed(
+  () =>
+    environmentCreation.isCreating.value ||
+    requestProcessing.isProcessing.value,
+);
+const processingStep = computed(
+  () =>
+    environmentCreation.creationStep.value ||
+    requestProcessing.processingStep.value,
+);
 
 const handleFileUploadSuccess = (
-  result: any,
+  result: ImportResult,
   fileContent?: string,
   fileName?: string,
 ) => {
@@ -81,7 +94,7 @@ const handleFileUploadSuccess = (
   handleImportSuccess(result, fileName);
 };
 
-const handleImportSuccess = (result: any, fileName?: string) => {
+const handleImportSuccess = (result: ImportResult, fileName?: string) => {
   importResult.value = result;
 
   if (result.type === "environment") {
@@ -103,15 +116,13 @@ const handleImportSuccess = (result: any, fileName?: string) => {
 };
 
 const handleImportError = (error: string) => {
-  if (sdk.window && sdk.window.showToast) {
-    sdk.window.showToast("Import failed: " + error, {
-      variant: "error",
-      duration: 5000,
-    });
-  }
+  sdk.window.showToast("Import failed: " + error, {
+    variant: "error",
+    duration: 5000,
+  });
 };
 
-const handleRequestsSelected = (requests: any[]) => {
+const handleRequestsSelected = (requests: ImportedRequest[]) => {
   selectedRequests.value = requests;
   showRequestSelection.value = false;
   showAuthentication.value = true;
@@ -119,381 +130,47 @@ const handleRequestsSelected = (requests: any[]) => {
 
 const handleSelectionCancelled = () => {
   showRequestSelection.value = false;
-  importResult.value = null;
+  importResult.value = undefined;
   selectedRequests.value = [];
 };
 
 const handleEnvironmentSelectionCancelled = () => {
   showEnvironment.value = false;
-  importResult.value = null;
+  importResult.value = undefined;
   environmentVariables.value = [];
   environmentName.value = "";
 };
 
 const handleVariablesSelected = async (
-  selectedVariables: any[],
+  selectedVariables: EnvironmentVariable[],
   envName: string,
 ) => {
-  isProcessing.value = true;
-  processingStep.value = "Creating new environment...";
   showEnvironment.value = false;
-
-  const baseEnvironmentName = `[ReDocs]-${envName}`;
-  let uniqueEnvironmentName = baseEnvironmentName;
-  let counter = 1;
-
-  while (true) {
-    try {
-      await sdk.graphql.createEnvironment({
-        input: {
-          name: uniqueEnvironmentName,
-          variables: [],
-        },
-      });
-      break;
-    } catch (error: any) {
-      if (error.message && error.message.includes("already exists")) {
-        uniqueEnvironmentName = `${baseEnvironmentName}-${counter}`;
-        counter++;
-        if (counter > 100) {
-          throw new Error("Too many environment name collisions");
-        }
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  try {
-    const result = await sdk.backend.createEnvironmentVariables(
-      selectedVariables,
-      uniqueEnvironmentName,
-    );
-
-    if (result.success) {
-      const message = `Successfully created environment "${uniqueEnvironmentName}" with ${(result as any).variablesCreated} variables!`;
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(message, {
-          variant: "success",
-          duration: 4000,
-        });
-      }
-
-      if (importResult.value?.uploadedFileInfo) {
-        await saveFileToUserFiles(
-          importResult.value.uploadedFileInfo.name,
-          importResult.value.uploadedFileInfo.content,
-        );
-      }
-    } else {
-      const errorMessage =
-        result.message || result.error || "No variables were created";
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(`Environment creation failed: ${errorMessage}`, {
-          variant: "error",
-          duration: 5000,
-        });
-      }
-    }
-  } catch (error: any) {
-    if (sdk.window && sdk.window.showToast) {
-      sdk.window.showToast("Unexpected error: " + error.message, {
-        variant: "error",
-        duration: 5000,
-      });
-    }
-  } finally {
-    isProcessing.value = false;
-    processingStep.value = "";
-  }
+  await environmentCreation.createEnvironment(
+    selectedVariables,
+    envName,
+    importResult.value?.uploadedFileInfo,
+  );
 };
 
-const handleAuthConfigured = async (authConfig: any) => {
-  isProcessing.value = true;
-  processingStep.value = "Processing requests...";
-
-  try {
-    const result = await sdk.backend.createSessionsFromRequests(
-      selectedRequests.value,
-      importResult.value.collectionName,
-      authConfig,
-    );
-
-    if (result.success && result.processedRequests) {
-      processingStep.value = "Creating replay sessions...";
-      const createdCount = await createReplaySessionsInFrontend(
-        result.processedRequests,
-        result.collectionName,
-      );
-
-      const message = `Successfully created ${createdCount} replay sessions!`;
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(message, {
-          variant: "success",
-          duration: 4000,
-        });
-      }
-
-      if (importResult.value?.uploadedFileInfo) {
-        await saveFileToUserFiles(
-          importResult.value.uploadedFileInfo.name,
-          importResult.value.uploadedFileInfo.content,
-        );
-      }
-    } else {
-      const errorMessage = result.message || "Failed to process requests";
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(`Request processing failed: ${errorMessage}`, {
-          variant: "error",
-          duration: 5000,
-        });
-      }
-    }
-  } catch (error: any) {
-    if (sdk.window && sdk.window.showToast) {
-      sdk.window.showToast("Unexpected error: " + error.message, {
-        variant: "error",
-        duration: 5000,
-      });
-    }
-  } finally {
-    isProcessing.value = false;
-    processingStep.value = "";
-  }
+const handleAuthConfigured = async (authConfig: AuthConfig) => {
+  showAuthentication.value = false;
+  await requestProcessing.processRequests(
+    selectedRequests.value,
+    importResult.value?.collectionName || "Unknown",
+    authConfig,
+    importResult.value?.uploadedFileInfo,
+  );
 };
 
-const handleAuthSkipped = async (authConfig?: any) => {
-  isProcessing.value = true;
-  processingStep.value = "Processing requests...";
-
-  try {
-    const result = await sdk.backend.createSessionsFromRequests(
-      selectedRequests.value,
-      importResult.value.collectionName,
-      authConfig || { type: "none" },
-    );
-
-    if (result.success && result.processedRequests) {
-      processingStep.value = "Creating replay sessions...";
-      const createdCount = await createReplaySessionsInFrontend(
-        result.processedRequests,
-        result.collectionName,
-      );
-
-      const message = `Successfully created ${createdCount} replay sessions!`;
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(message, {
-          variant: "success",
-          duration: 4000,
-        });
-      }
-
-      if (importResult.value?.uploadedFileInfo) {
-        await saveFileToUserFiles(
-          importResult.value.uploadedFileInfo.name,
-          importResult.value.uploadedFileInfo.content,
-        );
-      }
-    } else {
-      const errorMessage = result.message || "Failed to process requests";
-      if (sdk.window && sdk.window.showToast) {
-        sdk.window.showToast(`Request processing failed: ${errorMessage}`, {
-          variant: "error",
-          duration: 5000,
-        });
-      }
-    }
-  } catch (error: any) {
-    if (sdk.window && sdk.window.showToast) {
-      sdk.window.showToast("Unexpected error: " + error.message, {
-        variant: "error",
-        duration: 5000,
-      });
-    }
-  } finally {
-    isProcessing.value = false;
-    processingStep.value = "";
-  }
-};
-
-const createReplaySessionsInFrontend = async (
-  processedRequests: Array<{
-    request: any;
-    spec: any;
-    sessionName: string;
-  }>,
-  collectionName: string,
-): Promise<number> => {
-  try {
-    const collections = sdk.replay.getCollections();
-    let finalCollectionName = collectionName;
-    let targetCollectionId = collections.find(
-      (c: any) => c.name === finalCollectionName,
-    )?.id;
-
-    if (targetCollectionId) {
-      let counter = 1;
-      do {
-        finalCollectionName = `${collectionName}${counter}`;
-        targetCollectionId = collections.find(
-          (c: any) => c.name === finalCollectionName,
-        )?.id;
-        counter++;
-      } while (targetCollectionId && counter < 100);
-    }
-
-    const createCollectionResult =
-      await sdk.graphql.createReplaySessionCollection({
-        input: {
-          name: finalCollectionName,
-        },
-      });
-
-    if (!createCollectionResult.createReplaySessionCollection?.collection?.id) {
-      throw new Error("Failed to create collection: No collection ID returned");
-    }
-
-    targetCollectionId =
-      createCollectionResult.createReplaySessionCollection.collection.id;
-
-    let createdCount = 0;
-    const sessionErrors: string[] = [];
-
-    const processSession = async (
-      spec: any,
-      sessionName: string,
-      index: number,
-    ): Promise<void> => {
-      try {
-        const createSessionResult = await sdk.graphql.createReplaySession({
-          input: {
-            requestSource: {
-              raw: {
-                raw: buildRawRequest(spec),
-                connectionInfo: {
-                  host: spec.host || "example.com",
-                  port: spec.port || (spec.tls !== false ? 443 : 80),
-                  isTLS: spec.tls !== false,
-                },
-              },
-            },
-          },
-        });
-
-        const sessionId = createSessionResult.createReplaySession?.session?.id;
-        if (!sessionId) {
-          const errorMsg = "Failed to get session ID after creation";
-          sessionErrors.push(`Session ${index + 1}: ${errorMsg}`);
-          return;
-        }
-
-        try {
-          await (sdk.replay as any).moveSession(sessionId, targetCollectionId);
-        } catch (moveError: any) {
-          sessionErrors.push(`Session ${index + 1} move: ${moveError.message}`);
-        }
-
-        try {
-          await sdk.graphql.renameReplaySession({
-            id: sessionId,
-            name: sessionName,
-          });
-        } catch (renameError: any) {
-          sessionErrors.push(
-            `Session ${index + 1} rename: ${renameError.message}`,
-          );
-        }
-
-        createdCount++;
-      } catch (sessionError: any) {
-        sessionErrors.push(`Session ${index + 1}: ${sessionError.message}`);
-      }
-    };
-
-    const batchSize = 5;
-    for (let i = 0; i < processedRequests.length; i += batchSize) {
-      const batch = processedRequests.slice(i, i + batchSize);
-
-      const batchPromises = batch.map((item, batchIndex) =>
-        processSession(item.spec, item.sessionName, i + batchIndex),
-      );
-
-      try {
-        // eslint-disable-next-line compat/compat
-        await Promise.all(batchPromises);
-      } catch (batchError: any) {
-        console.warn(
-          "Batch processing error (continuing):",
-          batchError.message,
-        );
-      }
-
-      if (i + batchSize < processedRequests.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-
-    if (sessionErrors.length > 0) {
-      console.warn("Some sessions failed to create:", sessionErrors);
-
-      if (sdk.window?.showToast) {
-        sdk.window.showToast(
-          `${createdCount}/${processedRequests.length} sessions created successfully. Check console for details on failed sessions.`,
-          { variant: "warning", duration: 6000 },
-        );
-      }
-    }
-
-    return createdCount;
-  } catch (error: any) {
-    throw new Error(`Session creation failed: ${error.message}`);
-  }
-};
-
-const buildRawRequest = (spec: any): string => {
-  try {
-    const method = spec.method || "GET";
-    const host = spec.host || "example.com";
-    const port = spec.port || (spec.tls ? 443 : 80);
-    const path = spec.path || "/";
-    const query = spec.query || "";
-    const headers = spec.headers || {};
-    const body = spec.body || "";
-    const isTls = spec.tls !== false;
-
-    const fullPath = path + query;
-    let request = `${method} ${fullPath} HTTP/1.1\r\n`;
-
-    if ((isTls && port !== 443) || (!isTls && port !== 80)) {
-      request += `Host: ${host}:${port}\r\n`;
-    } else {
-      request += `Host: ${host}\r\n`;
-    }
-
-    for (const [name, value] of Object.entries(headers)) {
-      if (name && value && name.toLowerCase() !== "host") {
-        request += `${name}: ${value}\r\n`;
-      }
-    }
-
-    if (body && typeof body === "string" && body.length > 0) {
-      request += `Content-Length: ${body.length}\r\n`;
-    }
-
-    request += "\r\n";
-
-    if (body && typeof body === "string" && body.length > 0) {
-      request += body;
-    }
-
-    return request;
-  } catch (error) {
-    console.error("Error building raw request:", error);
-    const method = spec?.method || "GET";
-    const path = spec?.path || "/";
-    const host = spec?.host || "example.com";
-    return `${method} ${path} HTTP/1.1\r\nHost: ${host}\r\n\r\n`;
-  }
+const handleAuthSkipped = async (authConfig?: AuthConfig) => {
+  showAuthentication.value = false;
+  await requestProcessing.processRequests(
+    selectedRequests.value,
+    importResult.value?.collectionName || "Unknown",
+    authConfig || { type: "none" },
+    importResult.value?.uploadedFileInfo,
+  );
 };
 </script>
 
@@ -547,11 +224,11 @@ const buildRawRequest = (spec: any): string => {
     </div>
 
     <RequestSelectionModal
-      v-if="importResult"
+      v-if="importResult && importResult.type !== 'environment'"
       :visible="showRequestSelection"
-      :requests="importResult.requests || []"
+      :requests="collectionRequests"
       :collection-name="importResult.collectionName || 'Unknown'"
-      :collection-type="importResult.type || 'unknown'"
+      :collection-type="collectionType"
       @update:visible="showRequestSelection = $event"
       @requests-selected="handleRequestsSelected"
       @selection-cancelled="handleSelectionCancelled"
@@ -560,7 +237,7 @@ const buildRawRequest = (spec: any): string => {
     <EnvironmentModal
       v-if="importResult && importResult.type === 'environment'"
       :visible="showEnvironment"
-      :variables="environmentVariables"
+      :variables="environmentVariablesList"
       :environment-name="environmentName"
       @update:visible="showEnvironment = $event"
       @variables-selected="handleVariablesSelected"

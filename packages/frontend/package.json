@@ -8,6 +8,7 @@
   "dependencies": {
     "@caido/primevue": "0.1.2",
     "primevue": "4.1.0",
+    "shared": "workspace:*",
     "vue": "3.4.37"
   },
   "devDependencies": {
