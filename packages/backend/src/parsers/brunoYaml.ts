@@ -2,23 +2,20 @@ import type { SDK } from "caido:plugin";
 
 import { parseAllDocuments } from "../utils/minimalYaml.js";
 
+import { authFromYaml } from "./bruno/authentication.js";
+import type { BrunoAuth } from "./bruno/authentication.js";
+import { bodyFromYaml } from "./bruno/body.js";
+import type { BrunoBody } from "./bruno/body.js";
+import { headersFromYaml } from "./bruno/headers.js";
+
 export type BrunoRequest = {
   id: string;
   name: string;
   method: string;
   url: string;
   headers: Record<string, string>;
-  body?: {
-    mode: string;
-    raw?: string;
-    formdata?: Array<{ key: string; value: string; type: string }>;
-  };
-  auth?: {
-    type: string;
-    bearer?: { token: string };
-    apikey?: { key: string; value: string };
-    basic?: { username: string; password: string };
-  };
+  body?: BrunoBody;
+  auth?: BrunoAuth;
 };
 
 type BrunoCollection = {
@@ -43,50 +40,6 @@ type OpenCollectionDoc = {
     };
   };
 };
-
-function headersFromYaml(headers: unknown): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!Array.isArray(headers)) return out;
-  for (const h of headers) {
-    if (h !== null && typeof h === "object" && "name" in h) {
-      const name = String((h as Record<string, unknown>).name ?? "").trim();
-      const value = String((h as Record<string, unknown>).value ?? "").trim();
-      if (name !== "") out[name] = value;
-    }
-  }
-  return out;
-}
-
-function bodyFromYaml(body: unknown): BrunoRequest["body"] | undefined {
-  if (body === undefined || body === null || typeof body !== "object")
-    return undefined;
-  const b = body as Record<string, unknown>;
-  const data = b.data;
-  if (data === undefined) return undefined;
-  const raw = typeof data === "string" ? data : JSON.stringify(data);
-  return { mode: "raw", raw };
-}
-
-function authFromYaml(auth: unknown): BrunoRequest["auth"] | undefined {
-  if (auth === undefined || auth === null || typeof auth !== "object")
-    return undefined;
-  const a = auth as Record<string, unknown>;
-  const authType = typeof a.type === "string" ? a.type : "bearer";
-  const result: BrunoRequest["auth"] = { type: authType };
-  if (authType === "bearer" && a.token !== undefined) {
-    result.bearer = { token: String(a.token) };
-  }
-  if (authType === "apikey" && a.key !== undefined) {
-    result.apikey = { key: "Authorization", value: String(a.key) };
-  }
-  if (authType === "basic") {
-    result.basic = {
-      username: typeof a.username === "string" ? a.username : "",
-      password: typeof a.password === "string" ? a.password : "",
-    };
-  }
-  return result;
-}
 
 function docToRequest(
   doc: OpenCollectionDoc,

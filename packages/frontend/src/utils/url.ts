@@ -1,36 +1,34 @@
+const FALLBACK_BASE = "http://_";
+
 export const getPathFromUrl = (url: string): string => {
   if (url === undefined || url === "") return "/";
 
+  const trimmed = url.trim();
+  if (trimmed === "") return "/";
+
+  if (trimmed.includes("{{") && trimmed.includes("}}")) {
+    const templateEnd = trimmed.lastIndexOf("}}");
+    if (templateEnd !== -1) {
+      let pathAfterTemplate = trimmed.substring(templateEnd + 2).trim();
+      if (pathAfterTemplate !== "" && !pathAfterTemplate.startsWith("/")) {
+        pathAfterTemplate = "/" + pathAfterTemplate;
+      }
+      return pathAfterTemplate === "" ? "/" : pathAfterTemplate;
+    }
+  }
+
   try {
-    if (url.includes("{{") && url.includes("}}")) {
-      const templateEnd = url.lastIndexOf("}}");
-      if (templateEnd !== -1) {
-        let pathAfterTemplate = url.substring(templateEnd + 2);
-        if (!pathAfterTemplate.startsWith("/")) {
-          pathAfterTemplate = "/" + pathAfterTemplate;
-        }
-        return pathAfterTemplate;
-      }
-    }
-
-    if (url.includes("://")) {
-      const urlParts = url.split("://");
-      if (urlParts.length > 1 && urlParts[1] !== undefined) {
-        const afterProtocol = urlParts[1];
-        const firstSlash = afterProtocol.indexOf("/");
-        if (firstSlash !== -1) {
-          return afterProtocol.substring(firstSlash);
-        }
-        return "/";
-      }
-    }
-
-    if (url.startsWith("/")) {
-      return url;
-    }
-
-    return "/" + url;
+    /* eslint-disable compat/compat */
+    const parsed =
+      trimmed.startsWith("/") || !trimmed.includes("://")
+        ? new URL(trimmed, FALLBACK_BASE)
+        : new URL(trimmed);
+    /* eslint-enable compat/compat */
+    const pathname = parsed.pathname;
+    const search = parsed.search;
+    return pathname === "" ? "/" : pathname + search;
   } catch {
-    return url;
+    if (trimmed.startsWith("/")) return trimmed;
+    return "/" + trimmed;
   }
 };
