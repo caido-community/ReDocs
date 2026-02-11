@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { detectBrunoAuth, parseBrunoOpenCollectionYaml } from "./brunoYaml.js";
+import { detectBrunoAuth, parseBrunoOpenCollectionYaml } from "../bruno.js";
 
 const mockSdk = { console: { log: () => {} } } as unknown as Parameters<
   typeof parseBrunoOpenCollectionYaml
 >[0];
 
-describe("brunoYaml parser", () => {
+describe("bruno parser", () => {
   it("parses minimal OpenCollection YAML", async () => {
     const content = `
 info:

@@ -4,7 +4,7 @@ import type { ImportResult } from "shared";
 import {
   detectBrunoAuth,
   parseBrunoOpenCollectionYaml,
-} from "../parsers/brunoYaml.js";
+} from "../parsers/bruno.js";
 import { parsePostmanEnvironment } from "../parsers/environment.js";
 import {
   detectInsomniaAuth,

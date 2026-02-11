@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectOpenAPIAuth, parseOpenAPISpec } from "./openapi.js";
+import { detectOpenAPIAuth, parseOpenAPISpec } from "../openapi.js";
 
 const mockSdk = { console: { log: () => {} } } as unknown as Parameters<
   typeof parseOpenAPISpec

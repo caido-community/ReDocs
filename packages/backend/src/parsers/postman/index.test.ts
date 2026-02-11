@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectPostmanAuth, parsePostmanCollection } from "./postman.js";
+import { detectPostmanAuth, parsePostmanCollection } from "../postman.js";
 
 const mockSdk = { console: { log: () => {} } } as unknown as Parameters<
   typeof parsePostmanCollection

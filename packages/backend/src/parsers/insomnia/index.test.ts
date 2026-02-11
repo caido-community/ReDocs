@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectInsomniaAuth, parseInsomniaExport } from "./insomnia.js";
+import { detectInsomniaAuth, parseInsomniaExport } from "../insomnia.js";
 
 const mockSdk = { console: { log: () => {} } } as unknown as Parameters<
   typeof parseInsomniaExport

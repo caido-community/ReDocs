@@ -1,7 +1,7 @@
 import type { SDK } from "caido:plugin";
 import type { AuthConfig } from "shared";
 
-import type { BrunoRequest } from "../parsers/brunoYaml.js";
+import type { BrunoRequest } from "../parsers/bruno.js";
 import type { InsomniaRequest } from "../parsers/insomnia.js";
 import type { OpenAPIRequest } from "../parsers/openapi.js";
 import type { PostmanRequest } from "../parsers/postman.js";

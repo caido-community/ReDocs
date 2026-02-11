@@ -1,12 +1,12 @@
 import type { SDK } from "caido:plugin";
 
-import { parseAllDocuments } from "../utils/minimalYaml.js";
+import { parseAllDocuments } from "../../utils/minimalYaml.js";
 
-import { authFromYaml } from "./bruno/authentication.js";
-import type { BrunoAuth } from "./bruno/authentication.js";
-import { bodyFromYaml } from "./bruno/body.js";
-import type { BrunoBody } from "./bruno/body.js";
-import { headersFromYaml } from "./bruno/headers.js";
+import { authFromYaml } from "./authentication.js";
+import type { BrunoAuth } from "./authentication.js";
+import { bodyFromYaml } from "./body.js";
+import type { BrunoBody } from "./body.js";
+import { headersFromYaml } from "./headers.js";
 
 export type BrunoRequest = {
   id: string;
