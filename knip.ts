@@ -3,10 +3,10 @@ import type { RawConfigurationOrFn } from "knip/dist/types/config.js";
 const config: RawConfigurationOrFn = {
   workspaces: {
     ".": {
-      entry: ["caido.config.ts", "eslint.config.ts"],
+      entry: ["caido.config.ts", "knip.ts"],
+      project: ["*.{ts,mjs}"],
     },
     "packages/backend": {
-      entry: ["src/index.ts"],
       project: ["src/**/*.ts"],
       ignoreDependencies: ["caido"],
     },
@@ -15,7 +15,6 @@ const config: RawConfigurationOrFn = {
       project: ["src/**/*.{ts,tsx,vue}"],
     },
     "packages/shared": {
-      entry: ["src/index.ts"],
       project: ["src/**/*.ts"],
     },
   },

@@ -1,0 +1,124 @@
+{
+  "__export_format": 4,
+  "__export_date": "2025-02-09T12:00:00.000Z",
+  "__export_source": "redocs.example",
+  "resources": [
+    {
+      "_id": "wrk_workspace_1",
+      "_type": "Workspace",
+      "name": "ReDocs Example API",
+      "description": "Comprehensive Insomnia export for testing ReDocs import: GET/POST/PUT/DELETE, query/path params, JSON and form bodies, bearer/apikey/basic auth."
+    },
+    {
+      "_id": "req_get_users",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Get Users (with query params)",
+      "method": "GET",
+      "url": "https://api.example.com/v1/users?page=1&limit=10&sort=name",
+      "headers": "Accept: application/json\nX-Request-ID: {{ $timestamp }}",
+      "body": {}
+    },
+    {
+      "_id": "req_get_user_by_id",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Get User by ID",
+      "method": "GET",
+      "url": "https://api.example.com/v1/users/{{userId}}",
+      "headers": [
+        { "name": "Accept", "value": "application/json" },
+        { "name": "X-Tenant-ID", "value": "tenant-123" }
+      ]
+    },
+    {
+      "_id": "req_post_user_json",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Create User (JSON body)",
+      "method": "POST",
+      "url": "https://api.example.com/v1/users",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"user@example.com\",\n  \"name\": \"Test User\",\n  \"role\": \"admin\"\n}"
+      }
+    },
+    {
+      "_id": "req_post_form",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Submit Form (raw body)",
+      "method": "POST",
+      "url": "https://api.example.com/v1/feedback",
+      "headers": "Content-Type: application/x-www-form-urlencoded",
+      "body": {
+        "mimeType": "application/x-www-form-urlencoded",
+        "text": "subject=ReDocs%20Test&message=Hello%20world&priority=high"
+      }
+    },
+    {
+      "_id": "req_bearer_auth",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Protected (Bearer token)",
+      "method": "GET",
+      "url": "https://api.example.com/v1/me",
+      "headers": "Accept: application/json",
+      "authentication": {
+        "type": "bearer",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example"
+      }
+    },
+    {
+      "_id": "req_apikey_auth",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "API Key endpoint",
+      "method": "GET",
+      "url": "https://api.example.com/v1/admin/config",
+      "headers": [],
+      "auth": {
+        "type": "apikey",
+        "key": "X-API-Key",
+        "apiKey": "sk_live_xxxxxxxx"
+      }
+    },
+    {
+      "_id": "req_basic_auth",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Basic Auth endpoint",
+      "method": "GET",
+      "url": "https://api.example.com/v1/legacy/users",
+      "authentication": {
+        "type": "basic",
+        "username": "api_user",
+        "password": "api_secret"
+      }
+    },
+    {
+      "_id": "req_put_with_body",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Update User (PUT body)",
+      "method": "PUT",
+      "url": "https://api.example.com/v1/users/usr_123",
+      "headers": "Content-Type: application/json",
+      "body": {
+        "text": "{\"name\":\"Updated Name\",\"active\":true}"
+      }
+    },
+    {
+      "_id": "req_delete",
+      "_type": "Request",
+      "parentId": "wrk_workspace_1",
+      "name": "Delete User",
+      "method": "DELETE",
+      "url": "https://api.example.com/v1/users/usr_456"
+    }
+  ]
+}

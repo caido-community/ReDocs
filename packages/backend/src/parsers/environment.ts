@@ -1,18 +1,11 @@
 import type { SDK } from "caido:plugin";
+import type { EnvironmentVariable } from "shared";
 
-export interface EnvironmentVariable {
-  key: string;
-  value: string;
-  enabled: boolean;
-  type: "default" | "secret";
-  isSecret?: boolean;
-}
-
-export interface PostmanEnvironment {
+export type PostmanEnvironment = {
   name: string;
   description?: string;
   variables: EnvironmentVariable[];
-}
+};
 
 const SENSITIVE_KEYWORDS = [
   "token",
@@ -69,19 +62,27 @@ export async function parsePostmanEnvironment(
       );
     }
 
-    const variables: EnvironmentVariable[] = data.values
+    type EnvEntry = {
+      key?: string;
+      value?: string;
+      enabled?: boolean;
+      type?: string;
+    };
+    const values = data.values as EnvEntry[];
+    const variables: EnvironmentVariable[] = values
       .filter(
-        (item: any) =>
-          item &&
+        (item): item is EnvEntry & { key: string; value: string } =>
+          item !== undefined &&
+          item !== null &&
           typeof item === "object" &&
           typeof item.key === "string" &&
           typeof item.value === "string",
       )
-      .map((item: any) => ({
+      .map((item) => ({
         key: item.key,
         value: item.value,
         enabled: item.enabled !== false,
-        type: item.type || "default",
+        type: item.type ?? "default",
         isSecret: shouldBeSecret(item.key, item.value),
       }));
 

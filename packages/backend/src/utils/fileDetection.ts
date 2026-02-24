@@ -2,29 +2,26 @@ import type { SDK } from "caido:plugin";
 
 import { isPostmanEnvironment } from "../parsers/environment.js";
 
-/**
- * File type detection result
- */
+import { parseFirstDocument } from "./minimalYaml.js";
+
 export interface FileTypeResult {
-  type: "postman" | "openapi" | "environment" | "unknown";
-  confidence: number; // 0-1 confidence score
+  type:
+    | "postman"
+    | "openapi"
+    | "environment"
+    | "insomnia"
+    | "bruno"
+    | "unknown";
+  confidence: number;
   details: string;
 }
 
-/**
- * Detects the type of API documentation file based on content analysis
- * @param sdk - Caido SDK instance
- * @param content - Raw file content
- * @param fileName - Original file name (for additional hints)
- * @returns File type detection result
- */
 export function detectFileType(
   sdk: SDK,
   content: string,
   fileName: string,
 ): FileTypeResult {
   try {
-    // Parse as JSON first
     const data = JSON.parse(content);
 
     if (isPostmanCollection(data)) {
@@ -54,6 +51,14 @@ export function detectFileType(
       };
     }
 
+    if (isInsomniaExport(data)) {
+      return {
+        type: "insomnia",
+        confidence: 0.95,
+        details: "Insomnia export detected - contains request resources",
+      };
+    }
+
     const fileTypeFromName = detectFromFilename(fileName);
     if (fileTypeFromName !== "unknown") {
       return {
@@ -67,86 +72,102 @@ export function detectFileType(
       type: "unknown",
       confidence: 0,
       details:
-        "Valid JSON but does not match Postman collection or OpenAPI specification format",
+        "Valid JSON but does not match Postman collection, OpenAPI specification, or Insomnia export format",
     };
-  } catch (jsonError: any) {
-    // If JSON parsing fails, check for YAML but reject it
+  } catch (jsonError: unknown) {
     if (isLikelyYAML(content, fileName)) {
+      const yamlData = parseFirstDocument(content);
+      if (yamlData !== undefined && isBrunoOpenCollectionYaml(yamlData)) {
+        return {
+          type: "bruno",
+          confidence: 0.95,
+          details: "Bruno OpenCollection YAML detected",
+        };
+      }
       return {
         type: "unknown",
         confidence: 0,
         details:
-          "YAML files are not currently supported. Please convert to JSON format.",
+          "YAML format not recognized. Use Bruno OpenCollection YAML (.yaml/.yml) with info and http sections.",
       };
     }
 
+    const message =
+      jsonError instanceof Error ? jsonError.message : String(jsonError);
     return {
       type: "unknown",
       confidence: 0,
-      details: `File is not valid JSON and does not appear to be YAML: ${jsonError.message}`,
+      details: `File is not valid JSON and does not appear to be YAML: ${message}`,
     };
   }
 }
 
-/**
- * Checks if the parsed JSON object represents a Postman collection
- * @param data - Parsed JSON data
- * @returns True if this appears to be a Postman collection
- */
-function isPostmanCollection(data: any): boolean {
-  // Check for required Postman collection fields
-  if (!data.info || typeof data.info !== "object") {
+function isBrunoOpenCollectionYaml(data: unknown): boolean {
+  const doc = Array.isArray(data) ? data[0] : data;
+  if (doc === undefined || doc === null || typeof doc !== "object")
+    return false;
+  const o = doc as Record<string, unknown>;
+  const info = o.info;
+  const http = o.http;
+  if (
+    info === undefined ||
+    info === null ||
+    typeof info !== "object" ||
+    http === undefined ||
+    http === null ||
+    typeof http !== "object"
+  )
+    return false;
+  const infoObj = info as Record<string, unknown>;
+  const httpObj = http as Record<string, unknown>;
+  const type = infoObj.type;
+  const method = httpObj.method;
+  const url = httpObj.url;
+  return (
+    type === "http" && typeof method === "string" && typeof url === "string"
+  );
+}
+
+function isPostmanCollection(data: Record<string, unknown>): boolean {
+  const info = data.info;
+  if (info === undefined || info === null || typeof info !== "object") {
     return false;
   }
-
-  // Postman collections must have info.name
-  if (!data.info.name || typeof data.info.name !== "string") {
+  const infoObj = info as Record<string, unknown>;
+  if (infoObj.name === undefined || typeof infoObj.name !== "string") {
     return false;
   }
-
-  // Check for other Postman-specific indicators
   const hasPostmanSchema =
-    data.info.schema &&
-    typeof data.info.schema === "string" &&
-    data.info.schema.includes("postman");
-
-  const hasPostmanStructure = data.item && Array.isArray(data.item);
-
+    typeof infoObj.schema === "string" && infoObj.schema.includes("postman");
+  const hasPostmanStructure = Array.isArray(data.item);
   const hasPostmanVersion =
-    data.info._postman_id || data.info.version || hasPostmanSchema;
-
-  // Must have either the schema indicator or the typical structure
+    infoObj._postman_id !== undefined ||
+    infoObj.version !== undefined ||
+    hasPostmanSchema;
   return hasPostmanSchema || (hasPostmanStructure && hasPostmanVersion);
 }
 
-/**
- * Checks if the parsed JSON object represents an OpenAPI specification
- * @param data - Parsed JSON data
- * @returns True if this appears to be an OpenAPI specification
- */
-function isOpenAPISpec(data: any): boolean {
-  // Check for OpenAPI 3.x version
-  if (data.openapi && typeof data.openapi === "string") {
+function isOpenAPISpec(data: Record<string, unknown>): boolean {
+  if (typeof data.openapi === "string") {
     return data.openapi.startsWith("3.");
   }
-
-  // Check for Swagger 2.x version
-  if (data.swagger && typeof data.swagger === "string") {
+  if (typeof data.swagger === "string") {
     return data.swagger.startsWith("2.");
   }
-
-  // Additional checks for OpenAPI structure without version field
+  const info = data.info;
+  const paths = data.paths;
   if (
-    data.info &&
-    data.paths &&
-    typeof data.info === "object" &&
-    typeof data.paths === "object"
+    info !== undefined &&
+    paths !== undefined &&
+    typeof info === "object" &&
+    typeof paths === "object" &&
+    paths !== null
   ) {
-    // Check if paths object contains HTTP methods
-    const pathKeys = Object.keys(data.paths);
-    if (pathKeys.length > 0 && pathKeys[0]) {
-      const firstPath = data.paths[pathKeys[0]];
-      if (firstPath && typeof firstPath === "object") {
+    const pathKeys = Object.keys(paths);
+    const firstKey = pathKeys[0];
+    if (firstKey !== undefined) {
+      const firstPath = (paths as Record<string, unknown>)[firstKey];
+      if (firstPath !== undefined && typeof firstPath === "object") {
         const httpMethods = [
           "get",
           "post",
@@ -157,29 +178,45 @@ function isOpenAPISpec(data: any): boolean {
           "options",
         ];
         const hasHttpMethods = httpMethods.some(
-          (method) => method in firstPath,
+          (method) => method in (firstPath as object),
         );
-        if (hasHttpMethods) {
-          return true;
-        }
+        if (hasHttpMethods) return true;
       }
     }
   }
-
   return false;
 }
 
-/**
- * Attempts to detect file type from filename patterns
- * @param fileName - Original file name
- * @returns Detected file type or 'unknown'
- */
+function isInsomniaExport(data: Record<string, unknown>): boolean {
+  if (!data || typeof data !== "object") return false;
+  const resources = data.resources;
+  if (!Array.isArray(resources) || resources.length === 0) return false;
+  const hasRequest = resources.some((r) => {
+    if (r === undefined || r === null || typeof r !== "object") return false;
+    const t = (r as Record<string, unknown>)._type;
+    return typeof t === "string" && t.toLowerCase() === "request";
+  });
+  return hasRequest;
+}
+
 function detectFromFilename(
   fileName: string,
-): "postman" | "openapi" | "environment" | "unknown" {
+): "postman" | "openapi" | "environment" | "insomnia" | "bruno" | "unknown" {
   const lowerName = fileName.toLowerCase();
 
-  // Postman environment patterns
+  const brunoPatterns = ["bruno", "opencollection"];
+  for (const pattern of brunoPatterns) {
+    if (lowerName.includes(pattern)) return "bruno";
+  }
+
+  const insomniaPatterns = ["insomnia", "export"];
+
+  for (const pattern of insomniaPatterns) {
+    if (lowerName.includes(pattern)) {
+      return "insomnia";
+    }
+  }
+
   const environmentPatterns = [
     "environment",
     "env",
@@ -194,7 +231,6 @@ function detectFromFilename(
     }
   }
 
-  // Postman collection patterns
   const postmanPatterns = [
     "postman_collection",
     "collection",
@@ -211,7 +247,6 @@ function detectFromFilename(
     }
   }
 
-  // OpenAPI specification patterns
   const openApiPatterns = [
     "openapi",
     "swagger",
@@ -230,22 +265,14 @@ function detectFromFilename(
     }
   }
 
-  // File extension hints
   if (lowerName.endsWith(".yaml") || lowerName.endsWith(".yml")) {
-    return "openapi"; // Most YAML API files are OpenAPI specs
+    return "openapi";
   }
 
   return "unknown";
 }
 
-/**
- * Checks if content appears to be YAML format
- * @param content - Raw file content
- * @param fileName - File name for additional context
- * @returns True if this appears to be YAML
- */
 function isLikelyYAML(content: string, fileName: string): boolean {
-  // Check file extension
   if (
     fileName.toLowerCase().endsWith(".yaml") ||
     fileName.toLowerCase().endsWith(".yml")
@@ -253,12 +280,11 @@ function isLikelyYAML(content: string, fileName: string): boolean {
     return true;
   }
 
-  // Check for YAML indicators in content
   const yamlIndicators = [
-    /^---\s*$/m, // Document separator
-    /^\s*\w+:\s*$/m, // Key followed by colon
-    /^\s*-\s+/m, // List items
-    /^\s*[\w-]+:\s+[\w-]/m, // Key-value pairs
+    /^---\s*$/m,
+    /^\s*\w+:\s*$/m,
+    /^\s*-\s+/m,
+    /^\s*[\w-]+:\s+[\w-]/m,
   ];
 
   let indicatorCount = 0;
@@ -268,21 +294,20 @@ function isLikelyYAML(content: string, fileName: string): boolean {
     }
   }
 
-  // If we have multiple YAML indicators and no JSON indicators, likely YAML
   const hasJsonIndicators =
     content.trim().startsWith("{") || content.trim().startsWith("[");
 
   return indicatorCount >= 2 && !hasJsonIndicators;
 }
 
-/**
- * Validates that the detected file type can be processed
- * @param fileType - Detected file type
- * @param fileName - Original file name
- * @returns Validation result with support info
- */
 export function validateFileTypeSupport(
-  fileType: "postman" | "openapi" | "environment" | "unknown",
+  fileType:
+    | "postman"
+    | "openapi"
+    | "environment"
+    | "insomnia"
+    | "bruno"
+    | "unknown",
   fileName: string,
 ): {
   supported: boolean;
@@ -293,6 +318,18 @@ export function validateFileTypeSupport(
       return {
         supported: true,
         message: "Postman collections are fully supported",
+      };
+
+    case "insomnia":
+      return {
+        supported: true,
+        message: "Insomnia exports are fully supported",
+      };
+
+    case "bruno":
+      return {
+        supported: true,
+        message: "Bruno OpenCollection YAML is fully supported",
       };
 
     case "openapi": {
@@ -323,7 +360,7 @@ export function validateFileTypeSupport(
       return {
         supported: false,
         message:
-          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, or Postman environment (.json)",
+          "File format not recognized. Please ensure you are uploading a valid Postman collection, OpenAPI specification, Insomnia export, Bruno OpenCollection YAML, or Postman environment (.json)",
       };
   }
 }

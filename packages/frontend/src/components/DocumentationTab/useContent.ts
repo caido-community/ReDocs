@@ -22,7 +22,7 @@ export const useDocContent = () => {
     {
       title: "1. Prepare Your File",
       content:
-        "Export your API collection from Postman, save your OpenAPI specification as a JSON file, or export a Postman Environment.",
+        "Postman: export collection as JSON. OpenAPI: save spec as JSON. Insomnia: Export to get JSON. Bruno: Share → Export as Postman or OpenAPI, then import that file here.",
     },
     {
       title: "2. Import to ReDocs",
@@ -58,6 +58,23 @@ export const useDocContent = () => {
         "OpenAPI 3.x (.json only)",
         "Swagger 2.0 (.json only)",
         "Security schemes detection",
+      ],
+    },
+    {
+      title: "Insomnia",
+      color: "text-primary-400",
+      items: [
+        "Export (e.g. All Data or document) as JSON",
+        "Requests and auth detected",
+        "Import the exported file directly",
+      ],
+    },
+    {
+      title: "Bruno",
+      color: "text-primary-400",
+      items: [
+        "OpenCollection YAML (.yaml, .yml): import directly",
+        "Or Share → Export as Postman/OpenAPI, then import",
       ],
     },
     {
@@ -110,7 +127,7 @@ export const useDocContent = () => {
 
   const aboutInfo = {
     name: "ReDocs",
-    version: "1.0.3",
+    version: "1.1.0",
     description:
       "ReDocs helps security professionals quickly import API documentation into Caido for security testing.",
     author: {

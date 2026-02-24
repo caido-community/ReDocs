@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "ReDocs Example API",
+    "description": "Comprehensive Postman collection for testing ReDocs import: GET/POST/PUT/DELETE, query/path params, raw and formdata bodies, bearer/apikey/basic auth.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Users (with query params)",
+      "request": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/users?page=1&limit=10&sort=name",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "X-Request-ID", "value": "{{$timestamp}}" }
+        ]
+      }
+    },
+    {
+      "name": "Get User by ID",
+      "request": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/users/{{userId}}",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "X-Tenant-ID", "value": "tenant-123" }
+        ]
+      }
+    },
+    {
+      "name": "Create User (JSON body)",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/users",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@example.com\",\n  \"name\": \"Test User\",\n  \"role\": \"admin\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Submit Form (formdata)",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/v1/feedback",
+        "header": [
+          { "key": "Content-Type", "value": "multipart/form-data" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "subject", "value": "ReDocs Test", "type": "text" },
+            { "key": "message", "value": "Hello world", "type": "text" },
+            { "key": "priority", "value": "high", "type": "text" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Protected (Bearer token)",
+      "request": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/me",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example" }]
+        }
+      }
+    },
+    {
+      "name": "API Key endpoint",
+      "request": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/admin/config",
+        "header": [],
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            { "key": "value", "value": "sk_live_xxxxxxxx" },
+            { "key": "key", "value": "X-API-Key", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Basic Auth endpoint",
+      "request": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/legacy/users",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            { "key": "username", "value": "api_user" },
+            { "key": "password", "value": "api_secret" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update User (PUT body)",
+      "request": {
+        "method": "PUT",
+        "url": "https://api.example.com/v1/users/usr_123",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Updated Name\",\"active\":true}"
+        }
+      }
+    },
+    {
+      "name": "Delete User",
+      "request": {
+        "method": "DELETE",
+        "url": "https://api.example.com/v1/users/usr_456",
+        "header": [{ "key": "Accept", "value": "application/json" }]
+      }
+    }
+  ]
+}
