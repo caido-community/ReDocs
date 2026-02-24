@@ -12,9 +12,9 @@
     "shared": "workspace:*"
   },
   "devDependencies": {
-    "@caido/sdk-backend": "^0.46.0",
-    "eslint": "^9.39.2",
-    "knip": "^5.83.1",
-    "vitest": "^4.0.17"
+    "@caido/sdk-backend": "0.46.0",
+    "eslint": "9.39.2",
+    "knip": "5.83.1",
+    "vitest": "4.0.18"
   }
 }
